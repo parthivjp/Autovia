@@ -49,6 +49,7 @@ export default function Header() {
 
           {user ? (
             <div className="user-menu">
+              {user.role === 'admin' && <Link to="/admin" className="user-pill">Admin panel</Link>}
               <Link to="/profile" className="user-pill">
                 <UserCircle2 size={18} />
                 {user.name.split(' ')[0]}

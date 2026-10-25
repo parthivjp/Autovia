@@ -4,6 +4,9 @@ const settingSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true, default: 'general' },
   gstRate: { type: Number, default: 0.18, min: 0, max: 1 },
   businessName: { type: String, default: 'Autovia' },
+  contactEmail: { type: String, default: '' },
+  contactPhone: { type: String, default: '' },
+  businessAddress: { type: String, default: '' },
   cancellationHours: { type: Number, default: 24, min: 0 },
   lateFeePerHour: { type: Number, default: 500, min: 0 },
 }, { timestamps: true })

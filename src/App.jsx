@@ -1,5 +1,5 @@
 ﻿import { useLayoutEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Header from './components/Header'
 import HomePage from './pages/HomePage'
 import CarsPage from './pages/CarsPage'
@@ -10,6 +10,13 @@ import RegisterPage from './pages/RegisterPage'
 import ProfilePage from './pages/ProfilePage'
 import BookingPage from './pages/BookingPage'
 import ConfirmationPage from './pages/ConfirmationPage'
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminCarsPage from './pages/admin/AdminCarsPage'
+import AdminBookingsPage from './pages/admin/AdminBookingsPage'
+import AdminContentPage from './pages/admin/AdminContentPage'
+import AdminSettingsPage from './pages/admin/AdminSettingsPage'
 import Footer from './components/Footer'
 import { CarsProvider } from './context/CarsContext.jsx'
 import './styles/global.css'
@@ -30,12 +37,14 @@ function RouteScrollReset() {
 }
 
 function App() {
+  const { pathname } = useLocation()
+  const isAdminRoute = pathname.startsWith('/admin')
   return (
     <div className="app-shell">
       <RouteScrollReset />
       <CarsProvider>
-        <Header />
-        <main>
+        {!isAdminRoute && <Header />}
+        <div className={isAdminRoute ? 'admin-route-main' : undefined}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/cars" element={<CarsPage />} />
@@ -46,9 +55,18 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/booking/:carId" element={<BookingPage />} />
             <Route path="/confirmation/:bookingId" element={<ConfirmationPage />} />
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route path="/admin/locations" element={<Navigate to="/admin/content?tab=locations" replace />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="cars" element={<AdminCarsPage />} />
+              <Route path="bookings" element={<AdminBookingsPage />} />
+              <Route path="content" element={<AdminContentPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+            </Route>
           </Routes>
-        </main>
-        <Footer />
+        </div>
+        {!isAdminRoute && <Footer />}
       </CarsProvider>
     </div>
   )

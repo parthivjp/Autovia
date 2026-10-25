@@ -113,3 +113,8 @@
   font-size: 0.7rem;
   font-weight: 700;
 }
+
+.availability-tag.unavailable {
+  background: rgba(185, 28, 28, 0.08);
+  color: var(--error);
+}

@@ -82,15 +82,38 @@ export default function ProfilePage() {
   return (
     <div className="page-shell profile-page">
       <div className="profile-card profile-summary-card">
-        <span className="eyebrow">Account profile</span>
-        <h1>{profile?.name || user.name}</h1>
-        <div className="profile-list">
-          <p><strong>Email:</strong> {profile?.email || user.email}</p>
-          <p><strong>Phone:</strong> {profile?.phone || 'Not provided'}</p>
-          <p><strong>Licence:</strong> {profile?.drivingLicense || 'Not provided'}</p>
-          <p><strong>Licence document:</strong> {profile?.drivingLicenseDocument?.filename || 'Not uploaded'}</p>
+        <div className="profile-heading">
+          <div>
+            <span className="eyebrow">Account profile</span>
+            <h1>{profile?.name || user.name}</h1>
+          </div>
+          <span className="profile-avatar" aria-hidden="true">
+            {(profile?.name || user.name || 'A').trim().charAt(0).toUpperCase()}
+          </span>
         </div>
-        <form className="booking-form" onSubmit={handleSaveProfile}>
+        <div className="profile-list">
+          <div className="profile-detail">
+            <span>Email address</span>
+            <strong>{profile?.email || user.email}</strong>
+          </div>
+          <div className="profile-detail">
+            <span>Phone number</span>
+            <strong>{profile?.phone || 'Not provided'}</strong>
+          </div>
+          <div className="profile-detail">
+            <span>Driving licence</span>
+            <strong>{profile?.drivingLicense || 'Not provided'}</strong>
+          </div>
+          <div className="profile-detail profile-document">
+            <span>Licence document</span>
+            <strong>{profile?.drivingLicenseDocument?.filename || 'Not uploaded'}</strong>
+          </div>
+        </div>
+        <form className="profile-form" onSubmit={handleSaveProfile}>
+          <div className="profile-form-heading">
+            <h2>Personal details</h2>
+            <p>Keep your contact and licence information up to date.</p>
+          </div>
           <label>Full name
             <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
           </label>
@@ -104,13 +127,21 @@ export default function ProfilePage() {
             <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setLicenseFile(event.target.files?.[0] || null)} />
           </label>
           {saveError && <p className="form-error" role="alert">{saveError}</p>}
-          {saved && <p role="status">Profile updated.</p>}
-          <button type="submit" className="btn btn-secondary">Save profile</button>
+          {saved && <p className="profile-success" role="status">Profile updated successfully.</p>}
+          <button type="submit" className="btn btn-primary">Save changes</button>
         </form>
       </div>
 
       <div className="profile-card">
-        <span className="eyebrow">My bookings</span>
+        <div className="profile-bookings-heading">
+          <div>
+            <span className="eyebrow">Your trips</span>
+            <h2>My bookings</h2>
+          </div>
+          {!loading && !error && bookings.length > 0 && (
+            <span className="booking-count">{bookings.length} {bookings.length === 1 ? 'booking' : 'bookings'}</span>
+          )}
+        </div>
         {loading ? (
           <div className="empty-state">Loading your bookings…</div>
         ) : error ? (
@@ -132,7 +163,9 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="empty-state">
-            <p>You have no bookings yet.</p>
+            <span className="empty-state-icon" aria-hidden="true">↗</span>
+            <h3>No trips booked yet</h3>
+            <p>Your bookings will show up here once you reserve a car.</p>
             <Link to="/cars" className="btn btn-primary">Browse cars</Link>
           </div>
         )}

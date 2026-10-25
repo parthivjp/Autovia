@@ -3,6 +3,8 @@ import express from 'express'
 import authRoutes from './routes/authRoutes.js'
 import carRoutes from './routes/carRoutes.js'
 import bookingRoutes from './routes/bookingRoutes.js'
+import adminLocationRoutes from './routes/adminLocationRoutes.js'
+import adminRoutes from './routes/adminRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
 import siteRoutes from './routes/siteRoutes.js'
 import { errorHandler } from './middleware/errorHandler.js'
@@ -16,6 +18,8 @@ export function createApp() {
   app.use('/api/v1/auth', authRoutes)
   app.use('/api/v1/cars', carRoutes)
   app.use('/api/v1/bookings', bookingRoutes)
+  app.use('/api/v1/admin/locations', adminLocationRoutes)
+  app.use('/api/v1/admin', adminRoutes)
   app.use('/api/v1/profile', profileRoutes)
   app.use('/api/v1/site', siteRoutes)
   app.use((_req, res) => res.status(404).json({ error: 'Route not found.' }))

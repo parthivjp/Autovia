@@ -3,9 +3,10 @@ import mongoose from 'mongoose'
 const carSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
   name: { type: String, required: true, trim: true, maxlength: 120 },
+  registrationNumber: { type: String, default: '', trim: true, uppercase: true, maxlength: 32 },
   description: { type: String, default: '', maxlength: 2000 },
   modelYear: { type: Number, required: true, min: 1900, max: 2100 },
-  type: { type: String, required: true, enum: ['hatchback', 'sedan', 'suv', 'muv'] },
+  type: { type: String, required: true, lowercase: true, trim: true },
   fuel: { type: String, required: true, enum: ['petrol', 'diesel', 'cng', 'electric'] },
   seats: { type: Number, required: true, min: 1, max: 20 },
   transmission: { type: String, required: true, enum: ['manual', 'automatic'] },

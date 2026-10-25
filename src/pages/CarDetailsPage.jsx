@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Gauge, MapPin, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ChevronDown, Gauge, MapPin, Users } from 'lucide-react'
 import { useCars } from '../context/useCars'
 import { apiRequest } from '../services/api'
 import './CarDetailsPage.css'
@@ -13,6 +13,21 @@ export default function CarDetailsPage() {
   const [imageSelection, setImageSelection] = useState({ carId: '', source: '' })
   const [availability, setAvailability] = useState([])
   const [availabilityError, setAvailabilityError] = useState('')
+  const [siteLocations, setSiteLocations] = useState([])
+  const [locationsError, setLocationsError] = useState('')
+  const [locationsExpanded, setLocationsExpanded] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    apiRequest('/api/v1/site')
+      .then(({ locations }) => {
+        if (active) setSiteLocations(locations)
+      })
+      .catch((requestError) => {
+        if (active) setLocationsError(requestError.message)
+      })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (!carId) return undefined
@@ -32,6 +47,7 @@ export default function CarDetailsPage() {
   }, [carId])
 
   const selectedImage = imageSelection.carId === carId ? imageSelection.source : car?.image
+  const carUnavailable = ['under service', 'booked'].includes(car?.status?.toLowerCase().replaceAll('-', ' '))
 
   if (loading) return <div className="page-shell"><div className="empty-state">Loading car details…</div></div>
   if (error) return <div className="page-shell"><div className="empty-state" role="alert">Unable to load car details: {error}</div></div>
@@ -85,14 +101,41 @@ export default function CarDetailsPage() {
           {car.description && <p className="detail-description">{car.description}</p>}
 
           <div className="pickup-locations">
-            <h2>Pickup locations</h2>
-            {car.pickupLocations.map((location) => (
-              <span key={location}><MapPin size={15} /> {location}</span>
-            ))}
+            <div className="pickup-locations-heading">
+              <div>
+                <h2>Pickup locations</h2>
+                {siteLocations.length > 0 && <p>Choose from {siteLocations.length} convenient locations</p>}
+              </div>
+              {siteLocations.length > 3 && (
+                <button
+                  type="button"
+                  className="pickup-locations-toggle"
+                  aria-expanded={locationsExpanded}
+                  aria-controls="pickup-location-list"
+                  onClick={() => setLocationsExpanded((expanded) => !expanded)}
+                >
+                  {locationsExpanded ? 'Show less' : 'View all'}
+                  <ChevronDown size={15} className={locationsExpanded ? 'is-expanded' : ''} />
+                </button>
+              )}
+            </div>
+            {locationsError ? (
+              <p role="alert">Unable to load pickup locations: {locationsError}</p>
+            ) : siteLocations.length ? (
+              <div id="pickup-location-list" className={`pickup-location-list${locationsExpanded ? ' is-expanded' : ''}`}>
+                {(locationsExpanded ? siteLocations : siteLocations.slice(0, 3)).map((location) => (
+                  <span className="pickup-location-chip" key={location.id}>
+                    <MapPin size={14} /> {location.name}
+                  </span>
+                ))}
+              </div>
+            ) : <p>No pickup locations are currently available.</p>}
           </div>
 
           <div className="detail-actions">
-            <Link to={`/booking/${car.id}`} className="btn btn-primary">Book this car</Link>
+            {carUnavailable
+              ? <button type="button" className="btn btn-unavailable" disabled>{car.status === 'Booked' ? 'Currently booked' : 'Under service'}</button>
+              : <Link to={`/booking/${car.id}`} className="btn btn-primary">Book this car</Link>}
             <Link to="/cars" className="btn btn-secondary">View all cars</Link>
           </div>
         </div>

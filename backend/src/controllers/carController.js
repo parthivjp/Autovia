@@ -5,7 +5,7 @@ import { toCarResponse } from '../utils/carResponse.js'
 import { slugify } from '../utils/slugify.js'
 
 const carFields = [
-  'name', 'description', 'modelYear', 'type', 'fuel', 'seats', 'transmission', 'images',
+  'name', 'registrationNumber', 'description', 'modelYear', 'type', 'fuel', 'seats', 'transmission', 'images',
   'freeKm', 'status', 'featured', 'pickupLocations',
 ]
 const rateFields = ['dailyRate', 'weekendRate', 'extraKmCharge', 'securityDeposit', 'extraKmPackages']
@@ -67,6 +67,18 @@ export async function listCars(req, res) {
   const total = results.length
   const paginatedCars = results.slice((pageNumber - 1) * pageSize, pageNumber * pageSize)
   res.json({ cars: paginatedCars, pagination: { page: pageNumber, limit: pageSize, total, pages: Math.ceil(total / pageSize) } })
+}
+
+export async function listAdminCars(_req, res) {
+  const cars = await Car.find().populate('rentalRate').sort({ name: 1 }).lean()
+  return res.json({
+    cars: cars.map((car) => ({
+      ...toCarResponse(car),
+      registrationNumber: car.registrationNumber || '',
+      modelYear: car.modelYear,
+      rate: car.rentalRate || null,
+    })),
+  })
 }
 
 export async function getCar(req, res) {

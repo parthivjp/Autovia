@@ -46,6 +46,32 @@
   line-height: 1.7;
 }
 
+.footer-contact {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.footer-contact a,
+.footer-contact span,
+.footer-settings-error {
+  overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.footer-contact a:hover {
+  color: white;
+}
+
+.footer-settings-error {
+  display: block;
+  margin-top: 8px;
+  color: #f1c8bf;
+}
+
 .footer-links-group {
   display: grid;
   justify-items: start;

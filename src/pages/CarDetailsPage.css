@@ -120,10 +120,24 @@
   flex-wrap: wrap;
 }
 
+.btn-unavailable {
+  border: 1px solid rgba(185, 28, 28, 0.16);
+  background: rgba(185, 28, 28, 0.08);
+  color: var(--error);
+  cursor: not-allowed;
+}
+
 .pickup-locations {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0 0 22px;
+}
+
+.pickup-locations-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .pickup-locations h2,
@@ -131,11 +145,65 @@
   font-size: 1.15rem;
 }
 
-.pickup-locations span {
+.pickup-locations-heading p {
+  margin-top: 5px;
+  font-size: 0.8rem;
+}
+
+.pickup-locations-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: white;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pickup-locations-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.pickup-locations-toggle svg.is-expanded {
+  transform: rotate(180deg);
+}
+
+.pickup-location-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 84px;
+  overflow: hidden;
+}
+
+.pickup-location-list.is-expanded {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pickup-location-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.025);
   color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.pickup-location-chip svg {
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .availability-calendar {

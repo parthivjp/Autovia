@@ -71,14 +71,44 @@ for (const { dailyRate, weekendRate, extraKmCharge, securityDeposit, extraKmPack
   )
 }
 
-const locationCities = {
-  'Bengaluru Airport': 'Bengaluru',
-  'Delhi Connaught Place': 'Delhi',
-  'Mumbai Central': 'Mumbai',
-  'Goa Panaji': 'Goa',
-}
-for (const [name, city] of Object.entries(locationCities)) {
-  await Location.findOneAndUpdate({ name }, { $setOnInsert: { name, city, active: true } }, { upsert: true, new: true })
+const locations = [
+  { name: 'Ahmedabad Airport', city: 'Ahmedabad' },
+  { name: 'Ahmedabad Railway Station', city: 'Ahmedabad' },
+  { name: 'Anand Railway Station', city: 'Anand' },
+  { name: 'Ankleshwar Railway Station', city: 'Ankleshwar' },
+  { name: 'Bengaluru Airport', city: 'Bengaluru' },
+  { name: 'Bharuch Railway Station', city: 'Bharuch' },
+  { name: 'Bhavnagar Railway Station', city: 'Bhavnagar' },
+  { name: 'Chennai Airport', city: 'Chennai' },
+  { name: 'Delhi Connaught Place', city: 'Delhi' },
+  { name: 'Delhi Airport', city: 'Delhi' },
+  { name: 'Gandhidham Railway Station', city: 'Gandhidham' },
+  { name: 'Gandhinagar Capital Station', city: 'Gandhinagar' },
+  { name: 'Goa Panaji', city: 'Panaji' },
+  { name: 'Hyderabad Airport', city: 'Hyderabad' },
+  { name: 'Jamnagar Airport', city: 'Jamnagar' },
+  { name: 'Junagadh Railway Station', city: 'Junagadh' },
+  { name: 'Kolkata Airport', city: 'Kolkata' },
+  { name: 'Mehsana Railway Station', city: 'Mehsana' },
+  { name: 'Morbi Bus Station', city: 'Morbi' },
+  { name: 'Mumbai Airport', city: 'Mumbai' },
+  { name: 'Mumbai Central', city: 'Mumbai' },
+  { name: 'Nadiad Railway Station', city: 'Nadiad' },
+  { name: 'Pune Airport', city: 'Pune' },
+  { name: 'Porbandar Airport', city: 'Porbandar' },
+  { name: 'Rajkot Airport', city: 'Rajkot' },
+  { name: 'Surat Airport', city: 'Surat' },
+  { name: 'Surat Railway Station', city: 'Surat' },
+  { name: 'Vadodara Airport', city: 'Vadodara' },
+  { name: 'Vadodara Railway Station', city: 'Vadodara' },
+  { name: 'Vapi Railway Station', city: 'Vapi' },
+]
+for (const location of locations) {
+  await Location.findOneAndUpdate(
+    { name: location.name },
+    { $setOnInsert: { ...location, active: true } },
+    { upsert: true, new: true },
+  )
 }
 
 const carTypes = [
@@ -140,7 +170,7 @@ if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
     { $set: { name: 'Autovia Administrator', email: process.env.ADMIN_EMAIL.toLowerCase(), passwordHash, role: 'admin' } },
     { upsert: true, new: true, runValidators: true },
   )
-  console.log(`Admin login configured for ${process.env.ADMIN_EMAIL}.`)
+  console.log('Admin login configured.')
 }
 
 console.log(`Seeded ${demoCars.length} cars, rates, and customer website data.`)

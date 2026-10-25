@@ -21,6 +21,8 @@ let server
 let baseUrl
 let adminToken
 let customerToken
+let adminBookingId
+let adminCarId
 
 before(async () => {
   process.env.JWT_SECRET = 'integration-test-secret-that-is-long-enough'
@@ -177,7 +179,7 @@ test('customer site content, server quotes, bookings, availability, and wishlist
     freeKm: 250,
     pickupLocations: ['Test Location'],
   })
-  await Promise.all([
+  const [, testLocation, newLocation] = await Promise.all([
     RentalRate.create({
       car: car._id,
       dailyRate: 1000,
@@ -187,6 +189,7 @@ test('customer site content, server quotes, bookings, availability, and wishlist
       extraKmPackages: [{ label: 'No extra kilometres', km: 0, price: 0 }, { label: '100 extra km', km: 100, price: 250 }],
     }),
     Location.create({ name: 'Test Location', city: 'Test City' }),
+    Location.create({ name: 'Newly Added Location', city: 'Test City' }),
     Addon.create({ name: 'GPS', slug: 'test-gps', price: 300 }),
     Festival.create({ name: 'Test festival', date: '2027-01-02', multiplier: 2 }),
     CarType.create({ name: 'Sedan', slug: 'test-sedan' }),
@@ -200,6 +203,100 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   assert.equal(site.banners[0].title, 'Test banner')
   assert.ok(site.carTypes.some((type) => type.slug === 'test-sedan'))
   assert.ok(site.addons.some((addon) => addon.slug === 'test-gps'))
+  assert.ok(site.locations.some((location) => location.id === newLocation.id))
+  assert.ok(site.locations.some((location) => location.name === 'Test Location'))
+
+  const forbiddenLocationCreate = await fetch(`${baseUrl}/api/v1/admin/locations`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', customerToken].join(' ') },
+    body: JSON.stringify({ name: 'Admin Added Location', city: 'Test City' }),
+  })
+  assert.equal(forbiddenLocationCreate.status, 403)
+
+  const adminLocationResponse = await fetch(`${baseUrl}/api/v1/admin/locations`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', adminToken].join(' ') },
+    body: JSON.stringify({ name: 'Admin Added Location', city: 'Test City' }),
+  })
+  assert.equal(adminLocationResponse.status, 201)
+  const { location: adminLocation } = await adminLocationResponse.json()
+  const adminLocationsResponse = await fetch(`${baseUrl}/api/v1/admin/locations`, {
+    headers: { authorization: ['Bearer', adminToken].join(' ') },
+  })
+  assert.ok((await adminLocationsResponse.json()).locations.some((location) => location.id === adminLocation.id))
+
+  const adminLocationUpdate = await fetch(`${baseUrl}/api/v1/admin/locations/${adminLocation.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', adminToken].join(' ') },
+    body: JSON.stringify({ address: 'Updated address' }),
+  })
+  assert.equal(adminLocationUpdate.status, 200)
+  assert.equal((await adminLocationUpdate.json()).location.address, 'Updated address')
+
+  const disableAdminLocation = await fetch(`${baseUrl}/api/v1/admin/locations/${adminLocation.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', adminToken].join(' ') },
+    body: JSON.stringify({ active: false }),
+  })
+  assert.equal(disableAdminLocation.status, 200)
+  assert.ok(!(await (await fetch(`${baseUrl}/api/v1/site`)).json()).locations.some((location) => location.id === adminLocation.id))
+  const enableAdminLocation = await fetch(`${baseUrl}/api/v1/admin/locations/${adminLocation.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', adminToken].join(' ') },
+    body: JSON.stringify({ active: true }),
+  })
+  assert.equal(enableAdminLocation.status, 200)
+
+  const newLocationQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: car.slug,
+      pickupDate: '2027-01-01',
+      returnDate: '2027-01-02',
+      location: 'Newly Added Location',
+      returnLocation: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(newLocationQuote.status, 200)
+
+  await Location.updateOne({ _id: newLocation._id }, { $set: { active: false } })
+  const locationsAfterDisableResponse = await fetch(`${baseUrl}/api/v1/site`)
+  const locationsAfterDisable = await locationsAfterDisableResponse.json()
+  assert.ok(!locationsAfterDisable.locations.some((location) => location.id === newLocation.id))
+
+  const disabledLocationQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: car.slug,
+      pickupDate: '2027-01-01',
+      returnDate: '2027-01-02',
+      location: 'Newly Added Location',
+      returnLocation: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(disabledLocationQuote.status, 400)
+  const disabledLocationBooking = await fetch(`${baseUrl}/api/v1/bookings`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: ['Bearer', customerToken].join(' ') },
+    body: JSON.stringify({
+      carId: car.slug,
+      pickupDate: '2027-01-01',
+      returnDate: '2027-01-02',
+      pickupTime: '10:00',
+      returnTime: '10:00',
+      location: 'Newly Added Location',
+      returnLocation: 'Test Location',
+      driver: { name: 'Test Customer', phone: '1234567890', license: 'TEST-LICENCE' },
+      extraKm: 0,
+    }),
+  })
+  assert.equal(disabledLocationBooking.status, 400)
+  assert.equal(await Booking.countDocuments(), 0)
+  await Location.updateOne({ _id: newLocation._id }, { $set: { active: true } })
 
   const quoteResponse = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
     method: 'POST',
@@ -208,7 +305,7 @@ test('customer site content, server quotes, bookings, availability, and wishlist
       carId: car.slug,
       pickupDate: '2027-01-01',
       returnDate: '2027-01-04',
-      location: 'Test Location',
+      location: 'Newly Added Location',
       returnLocation: 'Test Location',
       addonIds: [site.addons.find((addon) => addon.slug === 'test-gps').id],
       extraKm: 100,
@@ -233,7 +330,7 @@ test('customer site content, server quotes, bookings, availability, and wishlist
       returnDate: '2027-01-04',
       pickupTime: '10:00',
       returnTime: '10:00',
-      location: 'Test Location',
+      location: 'Newly Added Location',
       returnLocation: 'Test Location',
       driver: { name: 'Test Customer', phone: '1234567890', license: 'TEST-LICENCE' },
       addonIds: [site.addons.find((addon) => addon.slug === 'test-gps').id],
@@ -242,9 +339,14 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   })
   assert.equal(bookingResponse.status, 201)
   const { booking } = await bookingResponse.json()
+  adminBookingId = booking.id
+  adminCarId = car.slug
   assert.equal(booking.total, 7139)
+  assert.equal(booking.location, 'Newly Added Location')
+  assert.equal(booking.returnLocation, 'Test Location')
   assert.equal(booking.paymentMethod, 'Pay at Pickup')
   assert.equal(await Booking.countDocuments({ bookingId: booking.id }), 1)
+  assert.equal(await Booking.countDocuments({ location: newLocation._id, returnLocation: testLocation._id }), 1)
 
   const deleteBookedCarResponse = await fetch(`${baseUrl}/api/v1/cars/${car.slug}`, {
     method: 'DELETE',
@@ -287,4 +389,217 @@ test('customer site content, server quotes, bookings, availability, and wishlist
     headers: { authorization: `Bearer ${customerToken}` },
   })
   assert.equal((await myBookingsResponse.json()).bookings[0].id, booking.id)
+})
+
+test('admin APIs protect the workspace and manage fleet operations, pricing, bookings, and website content', async () => {
+  const adminHeaders = { authorization: `Bearer ${adminToken}` }
+  const customerHeaders = { authorization: `Bearer ${customerToken}` }
+
+  const unauthorizedDashboard = await fetch(`${baseUrl}/api/v1/admin/dashboard`)
+  assert.equal(unauthorizedDashboard.status, 401)
+  const customerDashboard = await fetch(`${baseUrl}/api/v1/admin/dashboard`, { headers: customerHeaders })
+  assert.equal(customerDashboard.status, 403)
+
+  const dashboardResponse = await fetch(`${baseUrl}/api/v1/admin/dashboard`, { headers: adminHeaders })
+  assert.equal(dashboardResponse.status, 200)
+  const dashboard = await dashboardResponse.json()
+  assert.equal(typeof dashboard.stats.carsAvailable, 'number')
+  assert.ok(Array.isArray(dashboard.todayPickups))
+  assert.ok(Array.isArray(dashboard.recentBookings))
+
+  const resourcesResponse = await fetch(`${baseUrl}/api/v1/admin/resources`, { headers: adminHeaders })
+  assert.equal(resourcesResponse.status, 200)
+  const resources = await resourcesResponse.json()
+  assert.ok(resources.locations.some((location) => location.name === 'Test Location'))
+  assert.ok(resources.carTypes.some((type) => type.slug === 'test-sedan'))
+
+  const customerResourceWrite = await fetch(`${baseUrl}/api/v1/admin/resources/car-types`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...customerHeaders },
+    body: JSON.stringify({ name: 'Forbidden type' }),
+  })
+  assert.equal(customerResourceWrite.status, 403)
+
+  const typeCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ name: 'Estate', active: true }),
+  })
+  assert.equal(typeCreateResponse.status, 201)
+  const { item: estateType } = await typeCreateResponse.json()
+  assert.equal(estateType.slug, 'estate')
+  const typeUpdateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types/${estateType.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ name: 'Estate Wagon', active: false }),
+  })
+  assert.equal(typeUpdateResponse.status, 200)
+  assert.equal((await typeUpdateResponse.json()).item.active, false)
+
+  const bannerCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/banners`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ title: 'Summer trips', image: '/assets/summer.webp', active: true }),
+  })
+  assert.equal(bannerCreateResponse.status, 201)
+  const { item: banner } = await bannerCreateResponse.json()
+  const bannerDeleteResponse = await fetch(`${baseUrl}/api/v1/admin/resources/banners/${banner.id}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  })
+  assert.equal(bannerDeleteResponse.status, 204)
+
+  const settingsResponse = await fetch(`${baseUrl}/api/v1/admin/settings`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ gstRate: 0.2, businessName: 'Autovia Test', contactPhone: '1234567890' }),
+  })
+  assert.equal(settingsResponse.status, 200)
+  assert.equal((await settingsResponse.json()).settings.gstRate, 0.2)
+
+  const carListResponse = await fetch(`${baseUrl}/api/v1/admin/cars`, { headers: adminHeaders })
+  assert.equal(carListResponse.status, 200)
+  const adminCars = await carListResponse.json()
+  assert.equal(adminCars.cars.find((car) => car.id === adminCarId).registrationNumber, '')
+
+  const serviceCreateResponse = await fetch(`${baseUrl}/api/v1/admin/service-blocks`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ carId: adminCarId, date: '2027-01-05', reason: 'Repair' }),
+  })
+  assert.equal(serviceCreateResponse.status, 201)
+  const { item: serviceBlock } = await serviceCreateResponse.json()
+
+  const unavailableQuoteResponse = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-05',
+      returnDate: '2027-01-06',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(unavailableQuoteResponse.status, 409)
+  const updateServiceBlockResponse = await fetch(`${baseUrl}/api/v1/admin/service-blocks/${serviceBlock.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ date: '2027-01-06', reason: 'Parts delivery' }),
+  })
+  assert.equal(updateServiceBlockResponse.status, 200)
+  assert.equal((await updateServiceBlockResponse.json()).item.reason, 'Parts delivery')
+  const removeServiceBlockResponse = await fetch(`${baseUrl}/api/v1/admin/service-blocks/${serviceBlock.id}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  })
+  assert.equal(removeServiceBlockResponse.status, 204)
+
+  const updatedSettingsQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-05',
+      returnDate: '2027-01-06',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  const { pricing: updatedPricing } = await updatedSettingsQuote.json()
+  assert.equal(updatedPricing.gst, 200)
+  assert.equal(updatedPricing.total, 1200)
+
+  await User.updateOne(
+    { email: 'customer@test.local' },
+    { $set: { 'drivingLicenseDocument.filename': 'customer-license.png', 'drivingLicenseDocument.mimeType': 'image/png', 'drivingLicenseDocument.data': 'data:image/png;base64,aGVsbG8=' } },
+  )
+  const bookingDetailsResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, { headers: adminHeaders })
+  assert.equal(bookingDetailsResponse.status, 200)
+  const bookingDetails = await bookingDetailsResponse.json()
+  assert.equal(bookingDetails.booking.license.number, 'TEST-LICENCE')
+  assert.equal(bookingDetails.booking.license.filename, 'customer-license.png')
+  assert.equal(bookingDetails.booking.license.data, 'data:image/png;base64,aGVsbG8=')
+  const verifyLicenseResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ licenseVerified: true }),
+  })
+  assert.equal((await verifyLicenseResponse.json()).booking.status, 'pending')
+
+  for (const status of ['confirmed', 'picked-up']) {
+    const response = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', ...adminHeaders },
+      body: JSON.stringify({ status }),
+    })
+    assert.equal(response.status, 200)
+  }
+  const returnResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ status: 'returned', actualKmDriven: 1000, lateHours: 2 }),
+  })
+  assert.equal(returnResponse.status, 200)
+  assert.equal((await returnResponse.json()).booking.total, 9639)
+
+  const returnedBooking = await Booking.findOne({ bookingId: adminBookingId }).lean()
+  assert.equal(returnedBooking.status, 'returned')
+  assert.equal(returnedBooking.licenseVerified, true)
+  assert.equal(returnedBooking.extraKmDrivenCharge, 1500)
+  assert.equal(returnedBooking.lateFee, 1000)
+  const returnedDatesQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-02',
+      returnDate: '2027-01-03',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(returnedDatesQuote.status, 200)
+
+  const cancellableBookingResponse = await fetch(`${baseUrl}/api/v1/bookings`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...customerHeaders },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-05',
+      returnDate: '2027-01-06',
+      pickupTime: '10:00',
+      returnTime: '10:00',
+      location: 'Test Location',
+      returnLocation: 'Test Location',
+      driver: { name: 'Test Customer', phone: '1234567890', license: 'TEST-LICENCE' },
+      extraKm: 0,
+    }),
+  })
+  assert.equal(cancellableBookingResponse.status, 201)
+  const cancellableBooking = (await cancellableBookingResponse.json()).booking
+  const cancellationResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${cancellableBooking.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ status: 'cancelled' }),
+  })
+  assert.equal(cancellationResponse.status, 200)
+  const releasedDatesQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-05',
+      returnDate: '2027-01-06',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(releasedDatesQuote.status, 200)
+
+  const typeDeleteResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types/${estateType.id}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  })
+  assert.equal(typeDeleteResponse.status, 204)
 })

@@ -11,6 +11,7 @@ export default function CarCard({ car }) {
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const isSaved = wishlist.includes(car.id)
+  const availabilityStatus = car.status.toLowerCase().replaceAll('-', ' ')
   const handleWishlist = async () => {
     if (!user) {
       navigate('/login')
@@ -50,7 +51,7 @@ export default function CarCard({ car }) {
         </div>
 
         <div className="car-footer">
-          <span className="availability-tag">{car.status}</span>
+          <span className={`availability-tag${availabilityStatus === 'under service' || availabilityStatus === 'booked' ? ' unavailable' : ''}`}>{car.status}</span>
           <Link to={`/cars/${car.id}`} className="btn btn-primary small">View Details</Link>
         </div>
       </div>

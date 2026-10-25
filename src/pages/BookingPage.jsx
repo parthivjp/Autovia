@@ -22,6 +22,7 @@ export default function BookingPage() {
   const { cars, loading: carsLoading, error: carsError } = useCars()
   const car = cars.find((item) => item.id === carId)
   const [siteData, setSiteData] = useState({ addons: [], locations: [], settings: { gstRate: 0.18 } })
+  const [siteLoading, setSiteLoading] = useState(true)
   const [siteError, setSiteError] = useState('')
   const [dateDefaults] = useState(() => {
     const now = new Date()
@@ -32,7 +33,7 @@ export default function BookingPage() {
   const [pickupTime, setPickupTime] = useState('10:00')
   const [returnTime, setReturnTime] = useState('10:00')
   const [selectedLocation, setSelectedLocation] = useState('')
-  const availableLocations = siteData.locations.filter((item) => car?.pickupLocations.includes(item.name))
+  const availableLocations = siteData.locations
   const location = availableLocations.some((item) => item.name === selectedLocation)
     ? selectedLocation
     : availableLocations[0]?.name || ''
@@ -59,6 +60,9 @@ export default function BookingPage() {
       })
       .catch((requestError) => {
         if (active) setSiteError(requestError.message)
+      })
+      .finally(() => {
+        if (active) setSiteLoading(false)
       })
     return () => { active = false }
   }, [])
@@ -189,14 +193,20 @@ export default function BookingPage() {
                 <input type="time" value={returnTime} onChange={(event) => setReturnTime(event.target.value)} required />
               </label>
               <label className="booking-location">Pickup location
-                <select value={location} onChange={(event) => setSelectedLocation(event.target.value)} required>
+                <select value={location} onChange={(event) => setSelectedLocation(event.target.value)} disabled={siteLoading || Boolean(siteError) || !availableLocations.length} required>
+                  <option value="">
+                    {siteLoading ? 'Loading locations…' : siteError ? 'Unable to load locations' : availableLocations.length ? 'Select a pickup location' : 'No locations currently available'}
+                  </option>
                   {availableLocations.map((place) => (
                     <option key={place.id} value={place.name}>{place.name}</option>
                   ))}
                 </select>
               </label>
               <label className="booking-location">Return location
-                <select value={returnLocation} onChange={(event) => setSelectedReturnLocation(event.target.value)} required>
+                <select value={returnLocation} onChange={(event) => setSelectedReturnLocation(event.target.value)} disabled={siteLoading || Boolean(siteError) || !availableLocations.length} required>
+                  <option value="">
+                    {siteLoading ? 'Loading locations…' : siteError ? 'Unable to load locations' : availableLocations.length ? 'Select a return location' : 'No locations currently available'}
+                  </option>
                   {availableLocations.map((place) => (
                     <option key={place.id} value={place.name}>{place.name}</option>
                   ))}
@@ -260,12 +270,13 @@ export default function BookingPage() {
 
         <aside className="summary-card">
           <h2>Live price summary</h2>
-          <div className="summary-row"><span>Daily rate × {pricing?.days || '—'} days</span><strong>{formatCurrency(pricing?.rental)}</strong></div>
+          <div className="summary-row"><span>Daily rate × {pricing?.days || '—'} days</span><strong>{pricing ? formatCurrency(pricing.rental) : '—'}</strong></div>
           <div className="summary-row"><span>Weekend / festival rates</span><strong>Included above</strong></div>
-          <div className="summary-row"><span>Extra {selectedPackage?.km || 0} km</span><strong>{formatCurrency(pricing?.extraKm)}</strong></div>
-          <div className="summary-row"><span>Add-ons</span><strong>{formatCurrency(pricing?.addOns)}</strong></div>
-          <div className="summary-row"><span>GST ({Math.round((siteData.settings.gstRate || 0) * 100)}%)</span><strong>{formatCurrency(pricing?.gst)}</strong></div>
-          <div className="summary-total"><span>Total payable</span><strong>{quoteLoading ? 'Updating…' : formatCurrency(pricing?.total)}</strong></div>
+          <div className="summary-row"><span>Extra {selectedPackage?.km || 0} km</span><strong>{pricing ? formatCurrency(pricing.extraKm) : '—'}</strong></div>
+          <div className="summary-row"><span>Add-ons</span><strong>{pricing ? formatCurrency(pricing.addOns) : '—'}</strong></div>
+          <div className="summary-row"><span>GST ({Math.round((siteData.settings.gstRate || 0) * 100)}%)</span><strong>{pricing ? formatCurrency(pricing.gst) : '—'}</strong></div>
+          <div className="summary-total"><span>Total payable</span><strong>{quoteLoading ? 'Updating…' : pricing ? formatCurrency(pricing.total) : quoteError ? 'Unavailable' : '—'}</strong></div>
+          {quoteError && <p className="form-error" role="alert">Unable to calculate the price: {quoteError}</p>}
           <div className="summary-row deposit-row"><span>Refundable security deposit</span><strong>{formatCurrency(pricing?.securityDeposit ?? car.securityDeposit)}</strong></div>
           <p className="deposit-note">The security deposit is shown separately and is not included in the trip total.</p>
         </aside>

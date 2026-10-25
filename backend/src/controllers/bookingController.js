@@ -56,11 +56,16 @@ async function calculateQuote(input) {
     error.status = 404
     throw error
   }
+  if (car.status === 'under-service') {
+    const error = new Error('This car is currently under service and cannot be booked.')
+    error.status = 409
+    throw error
+  }
   const [location, returnLocation] = await Promise.all([
     Location.findOne({ name: locationName, active: true }),
     Location.findOne({ name: returnLocationName, active: true }),
   ])
-  if (!location || !returnLocation || !car.pickupLocations.includes(locationName) || !car.pickupLocations.includes(returnLocationName)) {
+  if (!location || !returnLocation) {
     const error = new Error('Choose valid pickup and return locations for this car.')
     error.status = 400
     throw error
@@ -71,7 +76,7 @@ async function calculateQuote(input) {
     ServiceBlock.find({ car: car._id, date: { $in: days } }).select('date').lean(),
     Booking.find({
       car: car._id,
-      status: { $ne: 'cancelled' },
+      status: { $nin: ['cancelled', 'returned', 'completed'] },
       pickupDate: { $lt: returnDate },
       returnDate: { $gt: pickupDate },
     }).select('bookingId').lean(),
@@ -196,9 +201,14 @@ function serializeBooking(booking) {
     driver: booking.driver,
     addOns: booking.addOns.map(({ name, price }) => ({ name, price })),
     extraKmPackage: booking.extraKmPackage,
-    total: booking.pricing.total,
+    total: booking.finalTotal ?? booking.pricing.total,
     deposit: booking.pricing.securityDeposit,
-    pricing: booking.pricing,
+    pricing: {
+      ...booking.pricing,
+      total: booking.finalTotal ?? booking.pricing.total,
+      extraKmDrivenCharge: booking.extraKmDrivenCharge || 0,
+      lateFee: booking.lateFee || 0,
+    },
     paymentMethod: 'Pay at Pickup',
     status: booking.status,
     createdAt: booking.createdAt,
@@ -224,13 +234,18 @@ export async function getAvailability(req, res) {
   }
   const car = await Car.findOne({ slug: req.params.id })
   if (!car) return res.status(404).json({ error: 'Car not found.' })
+  if (car.status === 'under-service') {
+    return res.json({
+      availability: dateKeys(from, new Date(to.valueOf() + DAY_MS)).map((date) => ({ date, status: 'Under Service' })),
+    })
+  }
 
   const dates = dateKeys(from, new Date(to.valueOf() + DAY_MS))
   const [blocks, bookings] = await Promise.all([
     ServiceBlock.find({ car: car._id, date: { $in: dates } }).select('date').lean(),
     Booking.find({
       car: car._id,
-      status: { $ne: 'cancelled' },
+      status: { $nin: ['cancelled', 'returned', 'completed'] },
       pickupDate: { $lte: dates.at(-1) },
       returnDate: { $gt: req.query.from },
     }).select('pickupDate returnDate').lean(),

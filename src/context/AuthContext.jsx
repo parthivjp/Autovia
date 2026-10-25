@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
     setUser(result.user)
     localStorage.setItem('autovia-user', JSON.stringify(result.user))
     localStorage.setItem('autovia-token', result.token)
-    return true
+    return result.user
   }
 
   const register = async ({ name, email, password, phone, drivingLicense, drivingLicenseDocument }) => {

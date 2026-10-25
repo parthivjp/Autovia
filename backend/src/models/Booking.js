@@ -37,7 +37,13 @@ const bookingSchema = new mongoose.Schema({
     securityDeposit: { type: Number, required: true, min: 0 },
   },
   paymentMethod: { type: String, enum: ['pay-at-pickup'], default: 'pay-at-pickup' },
-  status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'confirmed', 'picked-up', 'returned', 'cancelled', 'completed'], default: 'pending' },
+  licenseVerified: { type: Boolean, default: false },
+  actualKmDriven: { type: Number, min: 0 },
+  lateHours: { type: Number, min: 0, default: 0 },
+  extraKmDrivenCharge: { type: Number, min: 0, default: 0 },
+  lateFee: { type: Number, min: 0, default: 0 },
+  finalTotal: { type: Number, min: 0 },
 }, { timestamps: true })
 
 export const Booking = mongoose.model('Booking', bookingSchema)
