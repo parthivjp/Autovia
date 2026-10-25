@@ -14,12 +14,16 @@ import {
   updateServiceBlock,
 } from '../controllers/adminController.js'
 import { listAdminCars } from '../controllers/carController.js'
+import { changeAdminPassword, getAdminProfile, updateAdminProfile } from '../controllers/adminProfileController.js'
 import { authenticate, requireAdmin } from '../middleware/authenticate.js'
 
 const router = Router()
 
 router.use(authenticate, requireAdmin)
 router.get('/dashboard', getAdminDashboard)
+router.get('/profile', getAdminProfile)
+router.patch('/profile', updateAdminProfile)
+router.patch('/profile/password', changeAdminPassword)
 router.get('/resources', getAdminResources)
 router.get('/cars', listAdminCars)
 router.get('/bookings', listAdminBookings)

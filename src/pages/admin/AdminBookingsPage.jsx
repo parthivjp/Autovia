@@ -181,6 +181,16 @@ export default function AdminBookingsPage() {
                 <Detail label="Payment" value="Pay at Pickup" /><Detail label="Security deposit" value={currency(detail.pricing.securityDeposit)} />
               </dl>
             </div>
+            {detail.status === 'cancelled' && (
+              <div className="admin-detail-block">
+                <h3>Cancellation details</h3>
+                <dl className="admin-detail-grid">
+                  <Detail label="Cancelled by" value={detail.cancelledBy} />
+                  <Detail label="Cancelled at" value={detail.cancelledAt ? new Date(detail.cancelledAt).toLocaleString() : '—'} />
+                  <Detail label="Reason" value={detail.cancellationReason || 'No reason provided'} />
+                </dl>
+              </div>
+            )}
             <div className="admin-detail-block">
               <h3>Price breakdown</h3>
               <div className="admin-price-breakdown">

@@ -1038,6 +1038,20 @@
   max-width: 950px;
 }
 
+.admin-settings-stack {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+}
+
+.admin-settings-stack > * {
+  width: 100%;
+}
+
+.admin-settings-password-spacer {
+  min-width: 0;
+}
+
 .admin-settings-icon {
   display: inline-grid;
   width: 34px;
@@ -1353,6 +1367,7 @@
   .admin-content-form { grid-template-columns: 1fr; }
   .admin-settings-grid,
   .admin-settings-grid.policy { grid-template-columns: 1fr; }
+  .admin-settings-password-spacer { display: none; }
   .admin-section-heading { align-items: flex-start; }
   .admin-section-heading > .admin-search { min-width: 0; }
   .admin-license-card { align-items: flex-start; flex-direction: column; }

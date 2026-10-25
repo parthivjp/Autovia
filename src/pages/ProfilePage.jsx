@@ -19,6 +19,10 @@ export default function ProfilePage() {
   const [error, setError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [cancellationBookingId, setCancellationBookingId] = useState('')
+  const [cancellationReason, setCancellationReason] = useState('')
+  const [cancellationError, setCancellationError] = useState('')
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     if (!user) return undefined
@@ -86,6 +90,30 @@ export default function ProfilePage() {
       setSaved(true)
     } catch (requestError) {
       setSaveError(requestError.message)
+    }
+  }
+
+  const handleCancelBooking = async (event, bookingId) => {
+    event.preventDefault()
+    setCancellationError('')
+    setCancelling(true)
+    try {
+      const { booking: cancelledBooking } = await apiRequest(`/api/v1/bookings/mine/${bookingId}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: cancellationReason }),
+      })
+      setBookings((currentBookings) => currentBookings.map((booking) => (
+        booking.id === bookingId ? cancelledBooking : booking
+      )))
+      setCancellationBookingId('')
+      setCancellationReason('')
+    } catch (requestError) {
+      setCancellationError(requestError.message)
+      apiRequest('/api/v1/bookings/mine')
+        .then(({ bookings: result }) => setBookings(result))
+        .catch((refreshError) => setError(refreshError.message))
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -159,16 +187,78 @@ export default function ProfilePage() {
         ) : bookings.length ? (
           <div className="booking-list">
             {bookings.map((booking) => (
-              <Link to={`/confirmation/${booking.id}`} key={booking.id} className="booking-item">
-                <div>
-                  <strong>{booking.car.name}</strong>
-                  <p>{booking.id} · {booking.pickup} to {booking.returnDate}</p>
-                </div>
-                <div className="booking-meta">
-                  <span className="status-tag">{booking.status}</span>
-                  <strong>₹{Number(booking.total).toLocaleString('en-IN')}</strong>
-                </div>
-              </Link>
+              <div key={booking.id} className="booking-item">
+                <Link to={`/confirmation/${booking.id}`} className="booking-item-link">
+                  <div>
+                    <strong>{booking.car.name}</strong>
+                    <p>{booking.id} · {booking.pickup} to {booking.returnDate}</p>
+                  </div>
+                  <div className="booking-meta">
+                    <span className={`status-tag status-${booking.status}`}>{booking.status.replaceAll('-', ' ')}</span>
+                    <strong>₹{Number(booking.total).toLocaleString('en-IN')}</strong>
+                  </div>
+                </Link>
+                {booking.status === 'cancelled' && (
+                  <div className="booking-cancellation-info">
+                    <strong>Booking cancelled</strong>
+                    {booking.cancelledAt && <span>{new Date(booking.cancelledAt).toLocaleString()}</span>}
+                    {booking.cancellationReason && <p>Reason: {booking.cancellationReason}</p>}
+                  </div>
+                )}
+                {booking.cancellation?.canCancel && (
+                  <div className="booking-cancel-actions">
+                    {cancellationBookingId === booking.id ? (
+                      <form onSubmit={(event) => handleCancelBooking(event, booking.id)}>
+                        <p>This will cancel your reservation and release the car. This action cannot be undone.</p>
+                        <label>
+                          Reason for cancellation <span>(optional)</span>
+                          <textarea
+                            rows="2"
+                            maxLength="500"
+                            value={cancellationReason}
+                            onChange={(event) => setCancellationReason(event.target.value)}
+                          />
+                        </label>
+                        {cancellationError && <p className="form-error" role="alert">{cancellationError}</p>}
+                        <div className="booking-cancel-buttons">
+                          <button type="submit" className="btn btn-danger" disabled={cancelling}>
+                            {cancelling ? 'Cancelling…' : 'Confirm cancellation'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-cancel-secondary"
+                            disabled={cancelling}
+                            onClick={() => {
+                              setCancellationBookingId('')
+                              setCancellationReason('')
+                              setCancellationError('')
+                            }}
+                          >
+                            Keep booking
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="booking-cancel-prompt">
+                        <p>You can cancel at least {booking.cancellation.cancellationHours} hours before pickup.</p>
+                        <button
+                          type="button"
+                          className="btn btn-cancel-booking"
+                          onClick={() => {
+                            setCancellationBookingId(booking.id)
+                            setCancellationError('')
+                          }}
+                        >
+                          Cancel booking
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!booking.cancellation?.canCancel && ['pending', 'confirmed'].includes(booking.status) && (
+                  <p className="booking-cancellation-closed">Online cancellation is no longer available. Please contact support for assistance.</p>
+                )}
+              </div>
             ))}
           </div>
         ) : (

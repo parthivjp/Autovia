@@ -16,7 +16,7 @@ const pageTitles = {
   '/admin/cars': ['Cars & rates', 'Manage your fleet, availability and pricing'],
   '/admin/bookings': ['Bookings', 'Review reservations and manage each handover'],
   '/admin/content': ['Website content', 'Control the content customers see'],
-  '/admin/settings': ['Business settings', 'Manage tax, contact and rental policies'],
+  '/admin/settings': ['Account & business settings', 'Manage your admin profile, password, and rental policies'],
 }
 
 export default function AdminLayout() {

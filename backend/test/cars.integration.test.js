@@ -194,6 +194,75 @@ test('customer registration hashes passwords and never grants an admin role', as
   assert.equal((await profileUpdateResponse.json()).user.name, 'Updated Customer')
 })
 
+test('admin can update account details and securely change their password', async () => {
+  const adminHeaders = { authorization: ['Bearer', adminToken].join(' ') }
+  const customerHeaders = { authorization: ['Bearer', customerToken].join(' ') }
+
+  const profileResponse = await fetch(`${baseUrl}/api/v1/admin/profile`, { headers: adminHeaders })
+  assert.equal(profileResponse.status, 200)
+  assert.equal((await profileResponse.json()).user.email, 'admin@test.local')
+
+  const forbiddenProfileResponse = await fetch(`${baseUrl}/api/v1/admin/profile`, { headers: customerHeaders })
+  assert.equal(forbiddenProfileResponse.status, 403)
+
+  const profileUpdateResponse = await fetch(`${baseUrl}/api/v1/admin/profile`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ name: 'Updated Administrator', email: 'ADMIN-UPDATED@test.local', phone: '555-0100' }),
+  })
+  assert.equal(profileUpdateResponse.status, 200)
+  const updatedProfile = await profileUpdateResponse.json()
+  assert.equal(updatedProfile.user.name, 'Updated Administrator')
+  assert.equal(updatedProfile.user.email, 'admin-updated@test.local')
+  assert.equal(updatedProfile.user.phone, '555-0100')
+  assert.equal(updatedProfile.user.passwordHash, undefined)
+  const persistedProfile = await User.findById(updatedProfile.user._id)
+  assert.equal(persistedProfile.email, 'admin-updated@test.local')
+
+  const duplicateEmailResponse = await fetch(`${baseUrl}/api/v1/admin/profile`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ email: 'customer@test.local' }),
+  })
+  assert.equal(duplicateEmailResponse.status, 409)
+
+  const incorrectPasswordResponse = await fetch(`${baseUrl}/api/v1/admin/profile/password`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ currentPassword: 'incorrect-password', newPassword: 'new-admin-password' }),
+  })
+  assert.equal(incorrectPasswordResponse.status, 400)
+
+  const shortPasswordResponse = await fetch(`${baseUrl}/api/v1/admin/profile/password`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ currentPassword: 'admin-password', newPassword: 'short' }),
+  })
+  assert.equal(shortPasswordResponse.status, 400)
+
+  const passwordUpdateResponse = await fetch(`${baseUrl}/api/v1/admin/profile/password`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ currentPassword: 'admin-password', newPassword: 'new-admin-password' }),
+  })
+  assert.equal(passwordUpdateResponse.status, 200)
+  assert.equal((await passwordUpdateResponse.json()).message, 'Password updated successfully.')
+
+  const oldPasswordLogin = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'admin-updated@test.local', password: 'admin-password' }),
+  })
+  assert.equal(oldPasswordLogin.status, 401)
+
+  const newPasswordLogin = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'admin-updated@test.local', password: 'new-admin-password' }),
+  })
+  assert.equal(newPasswordLogin.status, 200)
+})
+
 test('customer site content, server quotes, bookings, availability, and wishlists use MongoDB', async () => {
   assert.equal(RentalRate.collection.collectionName, 'rentalrates')
   assert.equal(ServiceBlock.collection.collectionName, 'serviceblocks')
@@ -755,13 +824,16 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(returnedDatesQuote.status, 200)
 
+  const cancellablePickupDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const cancellableReturnDate = new Date(Date.parse(`${cancellablePickupDate}T00:00:00.000Z`) + 24 * 60 * 60 * 1000)
+    .toISOString().slice(0, 10)
   const cancellableBookingResponse = await fetch(`${baseUrl}/api/v1/bookings`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...customerHeaders },
     body: JSON.stringify({
       carId: adminCarId,
-      pickupDate: '2027-01-05',
-      returnDate: '2027-01-06',
+      pickupDate: cancellablePickupDate,
+      returnDate: cancellableReturnDate,
       pickupTime: '10:00',
       returnTime: '10:00',
       location: 'Test Location',
@@ -772,14 +844,54 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(cancellableBookingResponse.status, 201)
   const cancellableBooking = (await cancellableBookingResponse.json()).booking
+  assert.equal(cancellableBooking.status, 'pending')
+  const nearPickup = new Date(Date.now() + 330 * 60 * 1000 + 12 * 60 * 60 * 1000)
+  const nearPickupDate = nearPickup.toISOString().slice(0, 10)
+  const nearPickupTime = `${String(nearPickup.getUTCHours()).padStart(2, '0')}:${String(nearPickup.getUTCMinutes()).padStart(2, '0')}`
+  await Booking.updateOne(
+    { bookingId: cancellableBooking.id },
+    { $set: { pickupDate: nearPickupDate, pickupTime: nearPickupTime } },
+  )
+  const lateCancellationResponse = await fetch(`${baseUrl}/api/v1/bookings/mine/${cancellableBooking.id}/cancel`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...customerHeaders },
+    body: JSON.stringify({ reason: 'Too close to pickup' }),
+  })
+  assert.equal(lateCancellationResponse.status, 409)
+  await Booking.updateOne(
+    { bookingId: cancellableBooking.id },
+    { $set: { pickupDate: cancellablePickupDate, pickupTime: '10:00' } },
+  )
   const reservedCarList = await fetch(`${baseUrl}/api/v1/cars?search=Booking%20Test%20Car`).then((response) => response.json())
-  assert.deepEqual(reservedCarList.cars[0].nextBooking, { pickupDate: '2027-01-05', returnDate: '2027-01-06' })
-  const cancellationResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${cancellableBooking.id}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json', ...adminHeaders },
-    body: JSON.stringify({ status: 'cancelled' }),
+  assert.deepEqual(reservedCarList.cars[0].nextBooking, { pickupDate: cancellablePickupDate, returnDate: cancellableReturnDate })
+  const cancellationResponse = await fetch(`${baseUrl}/api/v1/bookings/mine/${cancellableBooking.id}/cancel`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...customerHeaders },
+    body: JSON.stringify({ reason: 'Plans changed' }),
   })
   assert.equal(cancellationResponse.status, 200)
+  const cancellation = await cancellationResponse.json()
+  assert.equal(cancellation.booking.status, 'cancelled')
+  assert.equal(cancellation.booking.cancellationReason, 'Plans changed')
+  assert.equal(cancellation.booking.cancellation.canCancel, false)
+  const savedCancellation = await Booking.findOne({ bookingId: cancellableBooking.id }).lean()
+  assert.equal(savedCancellation.cancellationReason, 'Plans changed')
+  assert.equal(savedCancellation.cancelledBy, 'customer')
+  assert.ok(savedCancellation.cancelledAt instanceof Date)
+
+  const duplicateCancellationResponse = await fetch(`${baseUrl}/api/v1/bookings/mine/${cancellableBooking.id}/cancel`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...customerHeaders },
+    body: JSON.stringify({ reason: 'Try again' }),
+  })
+  assert.equal(duplicateCancellationResponse.status, 409)
+  const otherCustomerCancellationResponse = await fetch(`${baseUrl}/api/v1/bookings/mine/${cancellableBooking.id}/cancel`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ reason: 'Not the owner' }),
+  })
+  assert.equal(otherCustomerCancellationResponse.status, 404)
+
   const releasedCarList = await fetch(`${baseUrl}/api/v1/cars?search=Booking%20Test%20Car`).then((response) => response.json())
   assert.equal(releasedCarList.cars[0].nextBooking, null)
   const releasedDatesQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
@@ -787,8 +899,8 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       carId: adminCarId,
-      pickupDate: '2027-01-05',
-      returnDate: '2027-01-06',
+      pickupDate: cancellablePickupDate,
+      returnDate: cancellableReturnDate,
       location: 'Test Location',
       extraKm: 0,
     }),

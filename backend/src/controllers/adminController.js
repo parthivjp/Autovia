@@ -232,6 +232,9 @@ function adminBookingView(booking) {
     lateHours: booking.lateHours,
     extraKmDrivenCharge: booking.extraKmDrivenCharge,
     lateFee: booking.lateFee,
+    cancellationReason: booking.cancellationReason || '',
+    cancelledAt: booking.cancelledAt || null,
+    cancelledBy: booking.cancelledBy || '',
     licenseVerified: Boolean(booking.licenseVerified),
     license: {
       number: customer?.drivingLicense || booking.driver?.license || '',
@@ -327,6 +330,13 @@ export async function updateAdminBooking(req, res) {
       booking.extraKmDrivenCharge = extraKmDrivenCharge
       booking.lateFee = lateFee
       booking.finalTotal = booking.pricing.total + extraKmDrivenCharge + lateFee
+    }
+    if (status === 'cancelled') {
+      booking.cancelledAt = new Date()
+      booking.cancelledBy = 'admin'
+      booking.cancellationReason = typeof req.body?.cancellationReason === 'string'
+        ? req.body.cancellationReason.trim().slice(0, 500)
+        : ''
     }
     booking.status = status
   }

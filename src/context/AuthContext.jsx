@@ -10,13 +10,17 @@ export function AuthProvider({ children }) {
     return storedToken && storedUser ? JSON.parse(storedUser) : null
   })
 
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser)
+    localStorage.setItem('autovia-user', JSON.stringify(updatedUser))
+  }
+
   const login = async ({ email, password }) => {
     const result = await apiRequest('/api/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     })
-    setUser(result.user)
-    localStorage.setItem('autovia-user', JSON.stringify(result.user))
+    updateUser(result.user)
     localStorage.setItem('autovia-token', result.token)
     return result.user
   }
@@ -26,8 +30,7 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify({ name, email, password, phone, drivingLicense, drivingLicenseDocument }),
     })
-    setUser(result.user)
-    localStorage.setItem('autovia-user', JSON.stringify(result.user))
+    updateUser(result.user)
     localStorage.setItem('autovia-token', result.token)
     return result.user
   }
@@ -37,8 +40,7 @@ export function AuthProvider({ children }) {
       method: 'PATCH',
       body: JSON.stringify(profile),
     })
-    setUser(result.user)
-    localStorage.setItem('autovia-user', JSON.stringify(result.user))
+    updateUser(result.user)
     return result.user
   }
 
@@ -48,7 +50,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('autovia-token')
   }
 
-  const value = useMemo(() => ({ user, login, register, saveProfile, logout }), [user])
+  const value = useMemo(() => ({ user, login, register, saveProfile, updateUser, logout }), [user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

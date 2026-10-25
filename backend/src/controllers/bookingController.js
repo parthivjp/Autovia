@@ -9,11 +9,30 @@ import { publishSiteUpdate } from '../services/siteUpdates.js'
 import { toCarResponse } from '../utils/carResponse.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+const INDIA_OFFSET_MS = 330 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
 
 function parseDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null
   const date = new Date(`${value}T00:00:00.000Z`)
   return Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== value ? null : date
+}
+
+function pickupInstant(booking) {
+  const [year, month, day] = booking.pickupDate.split('-').map(Number)
+  const [hours, minutes] = booking.pickupTime.split(':').map(Number)
+  return Date.UTC(year, month - 1, day, hours, minutes) - INDIA_OFFSET_MS
+}
+
+function cancellationInfo(booking, cancellationHours, now = Date.now()) {
+  const deadline = pickupInstant(booking) - cancellationHours * HOUR_MS
+  const statusAllowsCancellation = ['pending', 'confirmed'].includes(booking.status)
+  const withinCancellationWindow = now < deadline
+  return {
+    canCancel: statusAllowsCancellation && withinCancellationWindow,
+    cancellationHours,
+    cancellationDeadline: new Date(deadline).toISOString(),
+  }
 }
 
 function dateKeys(start, end) {
@@ -213,19 +232,84 @@ function serializeBooking(booking) {
     },
     paymentMethod: 'Pay at Pickup',
     status: booking.status,
+    cancellation: booking.cancellation,
+    cancellationReason: booking.cancellationReason || '',
+    cancelledAt: booking.cancelledAt || null,
     createdAt: booking.createdAt,
   }
 }
 
 export async function listMyBookings(req, res) {
-  const bookings = await Booking.find({ user: req.user._id }).populate('car').sort({ createdAt: -1 }).lean()
-  res.json({ bookings: bookings.map(serializeBooking) })
+  const [bookings, settings] = await Promise.all([
+    Booking.find({ user: req.user._id }).populate('car').sort({ createdAt: -1 }).lean(),
+    Setting.findOne({ key: 'general' }).select('cancellationHours').lean(),
+  ])
+  const cancellationHours = settings?.cancellationHours ?? 24
+  res.json({ bookings: bookings.map((booking) => serializeBooking({
+    ...booking,
+    cancellation: cancellationInfo(booking, cancellationHours),
+  })) })
 }
 
 export async function getMyBooking(req, res) {
   const booking = await Booking.findOne({ bookingId: req.params.id, user: req.user._id }).populate('car').lean()
   if (!booking) return res.status(404).json({ error: 'Booking not found.' })
-  return res.json({ booking: serializeBooking(booking) })
+  const settings = await Setting.findOne({ key: 'general' }).select('cancellationHours').lean()
+  return res.json({ booking: serializeBooking({
+    ...booking,
+    cancellation: cancellationInfo(booking, settings?.cancellationHours ?? 24),
+  }) })
+}
+
+export async function cancelMyBooking(req, res) {
+  const body = req.body || {}
+  const reason = body.reason ?? ''
+  if (typeof reason !== 'string' || reason.trim().length > 500) {
+    return res.status(400).json({ error: 'Cancellation reason must be text no longer than 500 characters.' })
+  }
+
+  const booking = await Booking.findOne({ bookingId: req.params.id, user: req.user._id })
+  if (!booking) return res.status(404).json({ error: 'Booking not found.' })
+  if (!['pending', 'confirmed'].includes(booking.status)) {
+    return res.status(409).json({ error: `A ${booking.status} booking cannot be cancelled by the customer.` })
+  }
+
+  const settings = await Setting.findOne({ key: 'general' }).select('cancellationHours').lean()
+  const cancellationHours = settings?.cancellationHours ?? 24
+  const info = cancellationInfo(booking, cancellationHours)
+  if (!info.canCancel) {
+    return res.status(409).json({
+      error: `This booking can no longer be cancelled online. Cancellations must be made at least ${cancellationHours} hours before pickup.`,
+      cancellationDeadline: info.cancellationDeadline,
+    })
+  }
+
+  const cancelledAt = new Date()
+  const updatedBooking = await Booking.findOneAndUpdate(
+    { _id: booking._id, user: req.user._id, status: { $in: ['pending', 'confirmed'] } },
+    {
+      $set: {
+        status: 'cancelled',
+        cancellationReason: reason.trim(),
+        cancelledAt,
+        cancelledBy: 'customer',
+      },
+    },
+    { new: true },
+  ).populate('car').lean()
+
+  if (!updatedBooking) {
+    return res.status(409).json({ error: 'This booking has already changed and can no longer be cancelled.' })
+  }
+
+  publishSiteUpdate()
+  return res.json({
+    message: 'Booking cancelled successfully.',
+    booking: serializeBooking({
+      ...updatedBooking,
+      cancellation: { ...info, canCancel: false },
+    }),
+  })
 }
 
 export async function getAvailability(req, res) {
