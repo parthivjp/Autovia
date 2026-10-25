@@ -29,23 +29,21 @@
 .filters-panel {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
   gap: 12px;
-  background: rgba(255,255,255,0.74);
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 16px;
+  background: rgba(255, 255, 255, 0.74);
   box-shadow: var(--shadow-soft);
 }
 
-.price-filter {
-  display: grid;
-  gap: 4px;
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  font-weight: 600;
+.filter-search {
+  grid-column: span 2;
 }
 
-.price-filter input {
+.price-filter {
+  display: block;
   min-width: 0;
 }
 
@@ -60,6 +58,20 @@
   padding: 0.9rem 1rem;
   background: white;
   color: var(--text);
+}
+
+.filters-panel > input,
+.filters-panel > select,
+.price-filter input {
+  min-width: 0;
+  min-height: 58px;
+}
+
+.filters-panel input:focus,
+.filters-panel select:focus {
+  outline: none;
+  border-color: rgba(198, 166, 107, 0.8);
+  box-shadow: 0 0 0 4px rgba(198, 166, 107, 0.14);
 }
 
 .empty-state {
@@ -104,6 +116,10 @@
 
   .filters-panel {
     grid-template-columns: 1fr;
+  }
+
+  .filter-search {
+    grid-column: auto;
   }
 }
 

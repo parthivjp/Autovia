@@ -1,42 +1,41 @@
 import { createContext, useContext, useMemo, useState } from 'react'
+import { apiRequest } from '../services/api'
 
 const AuthContext = createContext(null)
 
-const demoUser = {
-  id: 'u-demo-1',
-  name: 'Aarav Sharma',
-  email: 'aarav@example.com',
-  phone: '+91 99887 66554',
-  drivingLicense: 'DL-2024-3345',
-}
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
+    const storedToken = localStorage.getItem('autovia-token')
     const storedUser = localStorage.getItem('autovia-user')
-    return storedUser ? JSON.parse(storedUser) : null
+    return storedToken && storedUser ? JSON.parse(storedUser) : null
   })
 
-  const login = ({ email, password }) => {
-    if (email === 'aarav@example.com' && password === 'password123') {
-      const nextUser = { ...demoUser, email }
-      setUser(nextUser)
-      localStorage.setItem('autovia-user', JSON.stringify(nextUser))
-      return true
-    }
-
-    return false
+  const login = async ({ email, password }) => {
+    const result = await apiRequest('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+    setUser(result.user)
+    localStorage.setItem('autovia-user', JSON.stringify(result.user))
+    localStorage.setItem('autovia-token', result.token)
+    return true
   }
 
-  const register = ({ name, email, phone, drivingLicense }) => {
-    const nextUser = { id: `u-${Date.now()}`, name, email, phone, drivingLicense: drivingLicense || 'Pending review' }
-    setUser(nextUser)
-    localStorage.setItem('autovia-user', JSON.stringify(nextUser))
-    return true
+  const register = async ({ name, email, password, phone, drivingLicense }) => {
+    const result = await apiRequest('/api/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, phone, drivingLicense }),
+    })
+    setUser(result.user)
+    localStorage.setItem('autovia-user', JSON.stringify(result.user))
+    localStorage.setItem('autovia-token', result.token)
+    return result.user
   }
 
   const logout = () => {
     setUser(null)
     localStorage.removeItem('autovia-user')
+    localStorage.removeItem('autovia-token')
   }
 
   const value = useMemo(() => ({ user, login, register, logout }), [user])

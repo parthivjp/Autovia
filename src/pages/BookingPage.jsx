@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { demoCars } from '../data/demoCars'
+import { useCars } from '../context/useCars'
 import './BookingPage.css'
 
 const ADD_ONS = [
@@ -19,7 +19,6 @@ const EXTRA_KM_PACKAGES = [
 
 const FESTIVAL_DATES = ['2026-10-31', '2026-11-01', '2026-12-25']
 const GST_RATE = 0.18
-const WEEKEND_RATE = 1.2
 const FESTIVAL_RATE = 1.35
 
 function dateString(date) {
@@ -39,7 +38,8 @@ export default function BookingPage() {
   const { carId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const car = demoCars.find((item) => item.id === carId) || demoCars[0]
+  const { cars, loading, error: carsError } = useCars()
+  const car = cars.find((item) => item.id === carId)
   const [dateDefaults] = useState(() => {
     const now = new Date()
     return { today: dateString(now), pickup: addDays(now, 1), returnDate: addDays(now, 3) }
@@ -48,7 +48,8 @@ export default function BookingPage() {
   const [returnDate, setReturnDate] = useState(dateDefaults.returnDate)
   const [pickupTime, setPickupTime] = useState('10:00')
   const [returnTime, setReturnTime] = useState('10:00')
-  const [location, setLocation] = useState(car.pickupLocations[0])
+  const [selectedLocation, setSelectedLocation] = useState('')
+  const location = car?.pickupLocations.includes(selectedLocation) ? selectedLocation : car?.pickupLocations[0] || ''
   const [selectedAddOns, setSelectedAddOns] = useState([])
   const [extraKmPackage, setExtraKmPackage] = useState('none')
   const [driver, setDriver] = useState({
@@ -59,6 +60,10 @@ export default function BookingPage() {
   const [error, setError] = useState('')
 
   const pricing = useMemo(() => {
+    if (!car) {
+      return { days: 1, rental: 0, extraKm: 0, extraKmTotal: 0, addOnsTotal: 0, gst: 0, total: 0, deposit: 0 }
+    }
+
     const start = new Date(`${pickup}T00:00:00`)
     const end = new Date(`${returnDate}T00:00:00`)
     const days = Math.max(1, Math.ceil((end - start) / 86400000))
@@ -70,9 +75,9 @@ export default function BookingPage() {
       const key = dateString(day)
       const isWeekend = day.getDay() === 0 || day.getDay() === 6
       const rate = FESTIVAL_DATES.includes(key)
-        ? FESTIVAL_RATE
-        : isWeekend ? WEEKEND_RATE : 1
-      rental += Math.round(car.pricePerDay * rate)
+        ? Math.round(car.weekendRate * FESTIVAL_RATE)
+        : isWeekend ? car.weekendRate : car.pricePerDay
+      rental += rate
     }
 
     const packageChoice = EXTRA_KM_PACKAGES.find((item) => item.id === extraKmPackage)
@@ -94,6 +99,19 @@ export default function BookingPage() {
       deposit: car.securityDeposit || 5000,
     }
   }, [car, pickup, returnDate, extraKmPackage, selectedAddOns])
+
+  if (loading) return <div className="page-shell"><div className="empty-state">Loading booking details…</div></div>
+  if (carsError) return <div className="page-shell"><div className="empty-state" role="alert">Unable to load cars: {carsError}</div></div>
+  if (!car) {
+    return (
+      <div className="page-shell">
+        <div className="empty-state">
+          <p>This car is no longer available.</p>
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/cars')}>Browse cars</button>
+        </div>
+      </div>
+    )
+  }
 
   const toggleAddOn = (id) => {
     setSelectedAddOns((current) => (
@@ -167,7 +185,7 @@ export default function BookingPage() {
                 <input type="time" value={returnTime} onChange={(event) => setReturnTime(event.target.value)} required />
               </label>
               <label className="booking-location">Pickup location
-                <select value={location} onChange={(event) => setLocation(event.target.value)}>
+                <select value={location} onChange={(event) => setSelectedLocation(event.target.value)}>
                   {car.pickupLocations.map((place) => (
                     <option key={place} value={place}>{place}</option>
                   ))}

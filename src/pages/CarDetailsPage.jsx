@@ -1,18 +1,37 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CalendarDays, Gauge, MapPin, ShieldCheck, Users } from 'lucide-react'
-import { demoCars } from '../data/demoCars'
+import { useCars } from '../context/useCars'
 import './CarDetailsPage.css'
 
 export default function CarDetailsPage() {
   const { carId } = useParams()
   const navigate = useNavigate()
-  const car = demoCars.find((item) => item.id === carId) || demoCars[0]
-  const [calendarDays] = useState(() => Array.from({ length: 14 }, (_, index) => {
+  const { cars, loading, error } = useCars()
+  const car = cars.find((item) => item.id === carId)
+  const [calendarDates] = useState(() => Array.from({ length: 14 }, (_, index) => {
     const date = new Date()
     date.setDate(date.getDate() + index)
-    return { date, status: car.availableDates[index % car.availableDates.length] }
+    return date
   }))
+  const calendarDays = !car ? [] : calendarDates.map((date) => {
+    const key = date.toISOString().slice(0, 10)
+    const status = car.serviceBlocks.includes(key) ? 'Under Service' : car.status
+    return { date, status }
+  })
+
+  if (loading) return <div className="page-shell"><div className="empty-state">Loading car details…</div></div>
+  if (error) return <div className="page-shell"><div className="empty-state" role="alert">Unable to load car details: {error}</div></div>
+  if (!car) {
+    return (
+      <div className="page-shell">
+        <div className="empty-state">
+          <p>This car is no longer available.</p>
+          <Link to="/cars" className="btn btn-primary">Browse cars</Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page-shell detail-page">

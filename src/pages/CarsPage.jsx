@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { demoCars } from '../data/demoCars'
 import CarCard from '../components/CarCard'
+import { useCars } from '../context/useCars'
 import './CarsPage.css'
 
 const PAGE_SIZE = 4
 const vehicleTypes = ['all', 'hatchback', 'sedan', 'suv', 'muv']
 
 export default function CarsPage() {
+  const { cars, loading, error } = useCars()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [fuel, setFuel] = useState('all')
@@ -36,7 +37,7 @@ export default function CarsPage() {
   }
 
   const visibleCars = useMemo(() => {
-    const filtered = demoCars.filter((car) => {
+    const filtered = cars.filter((car) => {
       const matchesSearch = !search || `${car.name} ${car.category} ${car.fuel} ${car.transmission}`.toLowerCase().includes(search.trim().toLowerCase())
       const matchesType = type === 'all' || car.type.toLowerCase() === type
       const matchesFuel = fuel === 'all' || car.fuel.toLowerCase() === fuel
@@ -50,7 +51,7 @@ export default function CarsPage() {
     if (sort === 'price-desc') return filtered.sort((a, b) => b.pricePerDay - a.pricePerDay)
     if (sort === 'name') return filtered.sort((a, b) => a.name.localeCompare(b.name))
     return filtered
-  }, [search, type, fuel, transmission, seats, maxPrice, sort])
+  }, [cars, search, type, fuel, transmission, seats, maxPrice, sort])
 
   const pageCount = Math.ceil(visibleCars.length / PAGE_SIZE)
   const currentPage = Math.min(page, Math.max(pageCount, 1))
@@ -68,6 +69,7 @@ export default function CarsPage() {
 
       <div className="filters-panel">
         <input
+          className="filter-search"
           value={search}
           onChange={updateFilter(setSearch)}
           placeholder="Search by model or category"
@@ -96,13 +98,12 @@ export default function CarsPage() {
           <option value="7">7+ seats</option>
         </select>
         <label className="price-filter">
-          <span>Max price / day</span>
           <input
             type="number"
             min="0"
             value={maxPrice}
             onChange={updateFilter(setMaxPrice)}
-            placeholder="No limit"
+            placeholder="Max price / day"
             aria-label="Maximum daily price"
           />
         </label>
@@ -115,7 +116,11 @@ export default function CarsPage() {
       </div>
 
       <div className="cars-grid">
-        {pageCars.length > 0 ? (
+        {loading ? (
+          <div className="empty-state">Loading cars…</div>
+        ) : error ? (
+          <div className="empty-state" role="alert">Unable to load cars: {error}</div>
+        ) : pageCars.length > 0 ? (
           pageCars.map((car) => <CarCard key={car.id} car={car} />)
         ) : (
           <div className="empty-state">No cars match your filters. Try a wider search.</div>

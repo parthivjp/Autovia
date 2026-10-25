@@ -1,45 +1,88 @@
-# DriveNGo Car Rental Website
+# Autovia Car Rental
 
-A self-drive car rental web app featuring a customer website and an admin control panel.
-
-## Features
-
-- Customer homepage with banners, featured cars and segmented car types
-- Car listings with search, filters, sorting and pricing details
-- Car detail page with availability calendar
-- Booking flow with add-ons, GST breakdown and security deposit
-- Customer registration, login and profile state
-- Wishlist saving for cars
-- Admin login and dashboard for customers, bookings and settings
-- Admin CRUD for cars and configuration changes that flow directly to the customer website
+Autovia is a customer-facing car rental site with a React/Vite frontend and a separate Express/MongoDB backend. The current backend milestone moves car browsing and customer authentication to MongoDB; there is no admin interface.
 
 ## Stack
 
-- React + Vite frontend
-- Express backend with JSON persistence
-- Shared data model serving both the customer app and admin panel
+- Frontend: React, Vite, React Router
+- Backend: Node.js, Express, Mongoose, MVC folders under `backend/src`
+- Database: MongoDB
 
 ## Local setup
 
-1. Install dependencies:
+1. Install frontend dependencies from the repository root:
+
+   ```sh
    npm install
-2. Start the app in development mode:
+   ```
+
+2. Install backend dependencies:
+
+   ```sh
+   npm install --prefix backend
+   ```
+
+3. Ensure the local MongoDB service is running. Copy `backend/.env.example` to `backend/.env` and set a private, long `JWT_SECRET`. The default local database URI is:
+
+   ```text
+   mongodb://127.0.0.1:27017/autovia
+   ```
+
+4. Seed the seven demo cars and their rental rates:
+
+   ```sh
+   npm run seed
+   ```
+
+5. Start the frontend and backend together:
+
+   ```sh
    npm run dev
-3. Open the frontend at http://localhost:5173
-4. API runs at http://localhost:4000
+   ```
 
-## Demo accounts
+   Frontend: `http://localhost:5173`
+   Backend: `http://localhost:4000`
+   Health check: `http://localhost:4000/api/v1/health`
 
-Customer:
-- Email: customer@example.com
-- Password: password123
+## Backend MVC structure
 
-Admin:
-- Email: admin@drivengo.in
-- Password: admin123
+- `backend/src/config`: database connection
+- `backend/src/models`: Mongoose models (`Car`, `RentalRate`, `User`, `Festival`)
+- `backend/src/controllers`: request handling and persistence operations
+- `backend/src/routes`: REST resource routes
+- `backend/src/middleware`: authentication, role checks, and error responses
+- `backend/src/seed`: development car fixtures
+- `backend/src/scripts`: database seed command
 
-## Notes
+## Car REST API
 
-- The application uses a local JSON store under `server/data/store.json` for quick demo persistence.
-- The admin panel updates the same shared data source used by the customer-facing pages, so changes are reflected immediately.
-- Do not commit `.env`; use `.env.example` as the template.
+- `GET /api/v1/cars`: list, filter, sort, and paginate cars
+- `GET /api/v1/cars/:id`: read a car by its stable slug
+- `POST /api/v1/cars`: create a car and rental rate
+- `PATCH /api/v1/cars/:id`: update a car and/or rental rate
+- `DELETE /api/v1/cars/:id`: delete a car and its rental rate
+
+Car creation, updates, and deletion require a bearer token for a user with the `admin` role. Public registration always creates a `customer`; clients cannot self-assign admin access. To provision a development admin, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `backend/.env` and run the seed command. No admin screens are included.
+
+Customer registration and login are available at `POST /api/v1/auth/register` and `POST /api/v1/auth/login`. Passwords are bcrypt-hashed and the API returns a signed bearer token.
+
+## Demo images
+
+The seven car photos used by the demo fleet are stored locally in `public/assets/cars/` and served by the frontend.
+
+## Tests
+
+Run backend unit and MongoDB integration tests:
+
+```sh
+npm run test:backend
+```
+
+Integration tests use and clear only the `autovia_test` database. Keep that URI separate from any database containing user data.
+
+Frontend checks:
+
+```sh
+npm run build
+npm run lint
+```

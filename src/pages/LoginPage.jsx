@@ -6,21 +6,22 @@ import AuthLayout from '../components/AuthLayout'
 export default function LoginPage() {
   const navigate = useNavigate()
   const { login, user } = useAuth()
-  const [form, setForm] = useState({ email: 'aarav@example.com', password: 'password123' })
+  const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
 
   if (user) {
     return <Navigate to="/profile" replace />
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    const ok = login(form)
-    if (!ok) {
-      setError('Invalid credentials. Please use the demo account or register.')
-      return
+    setError('')
+    try {
+      await login(form)
+      navigate('/profile')
+    } catch (requestError) {
+      setError(requestError.message)
     }
-    navigate('/profile')
   }
 
   return (
@@ -30,7 +31,7 @@ export default function LoginPage() {
       description="Sign in to manage your bookings and get back on the road."
       footer={(
         <p className="auth-switch">
-          New to Autovia? <Link to="/register">Create an account</Link>
+          Don’t have an account? <Link to="/register">Sign up</Link>
         </p>
       )}
     >

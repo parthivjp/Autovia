@@ -14,7 +14,7 @@ export default function RegisterPage() {
     return <Navigate to="/profile" replace />
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
 
     if (!form.name || !form.email || !form.phone || !form.password || !form.drivingLicense || !licenseFileName) {
@@ -22,8 +22,13 @@ export default function RegisterPage() {
       return
     }
 
-    register(form)
-    navigate('/profile')
+    setError('')
+    try {
+      await register(form)
+      navigate('/profile')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
   }
 
   return (
@@ -34,7 +39,7 @@ export default function RegisterPage() {
       description="A few details now, then you’re ready to choose your next drive."
       footer={(
         <p className="auth-switch">
-          Already a member? <Link to="/login">Login</Link>
+          Already have an account? <Link to="/login">Login</Link>
         </p>
       )}
     >
@@ -86,6 +91,7 @@ export default function RegisterPage() {
           type="password"
           autoComplete="new-password"
           aria-label="Password"
+          minLength={8}
           value={form.password}
           onChange={(event) => setForm({ ...form, password: event.target.value })}
           placeholder="Create password"

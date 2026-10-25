@@ -39,6 +39,7 @@
 .brand:focus-visible,
 .nav-link:focus-visible,
 .wishlist-link:focus-visible,
+.auth-entry a:focus-visible,
 .user-pill:focus-visible,
 .mobile-toggle:focus-visible {
   outline: 3px solid rgba(198, 166, 107, 0.72);
@@ -148,7 +149,7 @@
   font-weight: 800;
 }
 
-.auth-buttons, .user-menu {
+.auth-entry, .user-menu {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -235,10 +236,6 @@
 
   .header-actions {
     gap: 8px;
-  }
-
-  .auth-buttons {
-    display: none;
   }
 }
 

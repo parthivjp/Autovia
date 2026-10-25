@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import { useWishlist } from '../context/WishlistContext'
-import { demoCars } from '../data/demoCars'
+import { useCars } from '../context/useCars'
 import './WishlistPage.css'
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist } = useWishlist()
-  const savedCars = demoCars.filter((car) => wishlist.includes(car.id))
+  const { cars, loading, error } = useCars()
+  const savedCars = cars.filter((car) => wishlist.includes(car.id))
 
   return (
     <div className="page-shell">
@@ -18,7 +19,11 @@ export default function WishlistPage() {
         <div className="results-pill">{savedCars.length} saved</div>
       </div>
 
-      {savedCars.length === 0 ? (
+      {loading ? (
+        <div className="empty-state">Loading saved cars…</div>
+      ) : error ? (
+        <div className="empty-state" role="alert">Unable to load saved cars: {error}</div>
+      ) : savedCars.length === 0 ? (
         <div className="empty-state">
           <Heart size={20} />
           <p>Your wishlist is empty. Save vehicles you like and compare them later.</p>

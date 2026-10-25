@@ -56,9 +56,8 @@ export default function Header() {
               <button className="btn btn-secondary small" type="button" onClick={handleLogout}>Logout</button>
             </div>
           ) : (
-            <div className="auth-buttons">
-              <Link to="/login" className="btn btn-secondary small">Login</Link>
-              <Link to="/register" className="btn btn-primary small">Register</Link>
+            <div className="auth-entry">
+              <Link to="/login" className="btn btn-primary small">Login or Signup</Link>
             </div>
           )}
 

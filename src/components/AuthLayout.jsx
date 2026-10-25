@@ -26,11 +26,6 @@ export default function AuthLayout({ eyebrow, title, description, footer, childr
             <h2>Find your kind of drive.</h2>
             <p>Pick a car, choose your dates, and make the road yours.</p>
           </div>
-          <div className="auth-featured-car">
-            <span className="auth-featured-label">FEATURED CAR</span>
-            <strong>{featuredCar.name}</strong>
-            <span>{featuredCar.category} <i /> {featuredCar.transmission}</span>
-          </div>
         </div>
       </aside>
     </section>

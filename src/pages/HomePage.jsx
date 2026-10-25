@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, ShieldCheck, Star } from 'lucide-react'
-import { carCategories, demoBenefits, demoCars, demoSteps } from '../data/demoCars'
+import { carCategories, demoBenefits, demoSteps } from '../data/demoCars'
+import { useCars } from '../context/useCars'
 import './HomePage.css'
-
-const featuredCars = demoCars.slice(0, 3)
 
 export default function HomePage() {
   const location = useLocation()
+  const { cars, loading, error } = useCars()
+  const featuredCars = (cars.some((car) => car.featured) ? cars.filter((car) => car.featured) : cars).slice(0, 3)
 
   useEffect(() => {
     if (location.hash) {
@@ -69,7 +70,11 @@ export default function HomePage() {
           <h2>Trending drives this week</h2>
         </div>
         <div className="card-grid">
-          {featuredCars.map((car) => (
+          {loading ? (
+            <div className="empty-state">Loading featured cars…</div>
+          ) : error ? (
+            <div className="empty-state" role="alert">Unable to load featured cars: {error}</div>
+          ) : featuredCars.length ? featuredCars.map((car) => (
             <article key={car.id} className="car-card-home">
               <img src={car.image} alt={car.name} />
               <div className="car-card-home__body">
@@ -91,7 +96,7 @@ export default function HomePage() {
                 </div>
               </div>
             </article>
-          ))}
+          )) : <div className="empty-state">No featured cars are available yet.</div>}
         </div>
       </section>
 
