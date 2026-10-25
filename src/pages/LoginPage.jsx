@@ -30,14 +30,9 @@ export default function LoginPage() {
       title="Login to your account"
       description="Sign in to manage your bookings and get back on the road."
       footer={(
-        <>
-          <p className="auth-switch">
-            Don’t have an account? <Link to="/register">Sign up</Link>
-          </p>
-          <p className="auth-switch">
-            <Link to="/admin/login">Administrator sign in</Link>
-          </p>
-        </>
+        <p className="auth-switch">
+          Don’t have an account? <Link to="/register">Sign up</Link>
+        </p>
       )}
     >
       <form onSubmit={handleSubmit} className="auth-form">
