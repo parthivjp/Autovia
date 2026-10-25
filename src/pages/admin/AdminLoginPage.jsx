@@ -98,7 +98,7 @@ export default function AdminLoginPage() {
             </label>
             {error && <p className="admin-alert error" role="alert">{error}</p>}
             <button className="admin-button primary full admin-login-submit" type="submit" disabled={saving}>
-              {saving ? 'Checking access…' : 'Sign in securely'}
+              {saving ? 'Signing in…' : 'Sign in'}
               {!saving && <ArrowUpRight size={17} />}
             </button>
           </form>

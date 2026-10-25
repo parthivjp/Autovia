@@ -428,6 +428,8 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   assert.equal(typeCreateResponse.status, 201)
   const { item: estateType } = await typeCreateResponse.json()
   assert.equal(estateType.slug, 'estate')
+  const siteWithEstateType = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.ok(siteWithEstateType.carTypes.some((type) => type.id === estateType.id))
   const typeUpdateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types/${estateType.id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', ...adminHeaders },
@@ -435,6 +437,8 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(typeUpdateResponse.status, 200)
   assert.equal((await typeUpdateResponse.json()).item.active, false)
+  const siteWithoutEstateType = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.ok(!siteWithoutEstateType.carTypes.some((type) => type.id === estateType.id))
 
   const bannerCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/banners`, {
     method: 'POST',
@@ -443,6 +447,16 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(bannerCreateResponse.status, 201)
   const { item: banner } = await bannerCreateResponse.json()
+  const siteWithBanner = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.ok(siteWithBanner.banners.some((item) => item.id === banner.id && item.title === 'Summer trips'))
+  const bannerUpdateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/banners/${banner.id}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ title: 'Autumn journeys', active: false }),
+  })
+  assert.equal(bannerUpdateResponse.status, 200)
+  const siteWithoutBanner = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.ok(!siteWithoutBanner.banners.some((item) => item.id === banner.id))
   const bannerDeleteResponse = await fetch(`${baseUrl}/api/v1/admin/resources/banners/${banner.id}`, {
     method: 'DELETE',
     headers: adminHeaders,
@@ -456,6 +470,79 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(settingsResponse.status, 200)
   assert.equal((await settingsResponse.json()).settings.gstRate, 0.2)
+  const siteWithSettings = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.equal(siteWithSettings.settings.businessName, 'Autovia Test')
+  const invalidGstResponse = await fetch(`${baseUrl}/api/v1/admin/settings`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ gstRate: 1.5 }),
+  })
+  assert.equal(invalidGstResponse.status, 400)
+  const invalidLateFeeResponse = await fetch(`${baseUrl}/api/v1/admin/settings`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ lateFeePerHour: -1 }),
+  })
+  assert.equal(invalidLateFeeResponse.status, 400)
+
+  const addonCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/addons`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ name: 'Admin-created GPS', price: 450, active: true }),
+  })
+  assert.equal(addonCreateResponse.status, 201)
+  const { item: adminAddon } = await addonCreateResponse.json()
+  const siteWithAddon = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
+  assert.ok(siteWithAddon.addons.some((item) => item.id === adminAddon.id && item.price === 450))
+  const addonQuoteResponse = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-07',
+      returnDate: '2027-01-08',
+      location: 'Test Location',
+      addonIds: [adminAddon.id],
+      extraKm: 0,
+    }),
+  })
+  assert.equal(addonQuoteResponse.status, 200)
+  const { pricing: addonPricing } = await addonQuoteResponse.json()
+  assert.equal(addonPricing.addOns, 450)
+  assert.equal(addonPricing.total, 1740)
+  const addonDeleteResponse = await fetch(`${baseUrl}/api/v1/admin/resources/addons/${adminAddon.id}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  })
+  assert.equal(addonDeleteResponse.status, 204)
+
+  const festivalCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/festivals`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ name: 'Admin-created festival', date: '2027-01-05', multiplier: 2 }),
+  })
+  assert.equal(festivalCreateResponse.status, 201)
+  const { item: festival } = await festivalCreateResponse.json()
+  const festivalQuoteResponse = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-05',
+      returnDate: '2027-01-06',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(festivalQuoteResponse.status, 200)
+  const { pricing: festivalPricing } = await festivalQuoteResponse.json()
+  assert.equal(festivalPricing.rental, 2000)
+  assert.equal(festivalPricing.total, 2400)
+  const festivalDeleteResponse = await fetch(`${baseUrl}/api/v1/admin/resources/festivals/${festival.id}`, {
+    method: 'DELETE',
+    headers: adminHeaders,
+  })
+  assert.equal(festivalDeleteResponse.status, 204)
 
   const carListResponse = await fetch(`${baseUrl}/api/v1/admin/cars`, { headers: adminHeaders })
   assert.equal(carListResponse.status, 200)
@@ -509,6 +596,29 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   const { pricing: updatedPricing } = await updatedSettingsQuote.json()
   assert.equal(updatedPricing.gst, 200)
   assert.equal(updatedPricing.total, 1200)
+  const updateAdminCarRate = await fetch(`${baseUrl}/api/v1/cars/${adminCarId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ rate: { dailyRate: 1500, weekendRate: 1700 } }),
+  })
+  assert.equal(updateAdminCarRate.status, 200)
+  const customerCarResponse = await fetch(`${baseUrl}/api/v1/cars/${adminCarId}`)
+  assert.equal((await customerCarResponse.json()).car.pricePerDay, 1500)
+  const updatedRateQuoteResponse = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      carId: adminCarId,
+      pickupDate: '2027-01-07',
+      returnDate: '2027-01-08',
+      location: 'Test Location',
+      extraKm: 0,
+    }),
+  })
+  assert.equal(updatedRateQuoteResponse.status, 200)
+  const { pricing: updatedRatePricing } = await updatedRateQuoteResponse.json()
+  assert.equal(updatedRatePricing.rental, 1500)
+  assert.equal(updatedRatePricing.total, 1800)
 
   await User.updateOne(
     { email: 'customer@test.local' },
@@ -526,7 +636,12 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
     body: JSON.stringify({ licenseVerified: true }),
   })
   assert.equal((await verifyLicenseResponse.json()).booking.status, 'pending')
-
+  const invalidBookingTransition = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ status: 'picked-up' }),
+  })
+  assert.equal(invalidBookingTransition.status, 409)
   for (const status of ['confirmed', 'picked-up']) {
     const response = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
       method: 'PATCH',
@@ -535,6 +650,12 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
     })
     assert.equal(response.status, 200)
   }
+  const invalidReturnInput = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', ...adminHeaders },
+    body: JSON.stringify({ status: 'returned', actualKmDriven: -1, lateHours: 2 }),
+  })
+  assert.equal(invalidReturnInput.status, 400)
   const returnResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${adminBookingId}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', ...adminHeaders },
