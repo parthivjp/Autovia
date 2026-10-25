@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import CarCard from '../components/CarCard'
+import { useSiteContent } from '../hooks/useSiteContent'
 import { apiRequest } from '../services/api'
 import './CarsPage.css'
 
@@ -15,25 +16,13 @@ export default function CarsPage() {
   const [sort, setSort] = useState('recommended')
   const [page, setPage] = useState(1)
   const [cars, setCars] = useState([])
-  const [carTypes, setCarTypes] = useState([])
   const [pagination, setPagination] = useState({ total: 0, pages: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const { data: siteData, version: siteVersion, error: siteError } = useSiteContent()
   const category = (searchParams.get('category') || 'all').toLowerCase()
-  const vehicleTypes = ['all', ...carTypes.map((carType) => carType.slug)]
+  const vehicleTypes = ['all', ...siteData.carTypes.map((carType) => carType.slug)]
   const type = vehicleTypes.includes(category) ? category : 'all'
-
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/site')
-      .then(({ carTypes: types }) => {
-        if (active) setCarTypes(types)
-      })
-      .catch((requestError) => {
-        if (active) setError(requestError.message)
-      })
-    return () => { active = false }
-  }, [])
 
   useEffect(() => {
     let active = true
@@ -63,7 +52,7 @@ export default function CarsPage() {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [page, search, type, fuel, transmission, seats, maxPrice, sort])
+  }, [page, search, type, fuel, transmission, seats, maxPrice, sort, siteVersion])
 
   const updateFilter = (setter) => (event) => {
     setter(event.target.value)
@@ -144,8 +133,8 @@ export default function CarsPage() {
       <div className="cars-grid">
         {loading ? (
           <div className="empty-state">Loading cars…</div>
-        ) : error ? (
-          <div className="empty-state" role="alert">Unable to load cars: {error}</div>
+        ) : error || siteError ? (
+          <div className="empty-state" role="alert">Unable to load current fleet or filters: {error || siteError}</div>
         ) : cars.length > 0 ? (
           cars.map((car) => <CarCard key={car.id} car={car} />)
         ) : (

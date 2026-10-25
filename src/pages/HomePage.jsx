@@ -1,29 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
 import { bookingSteps, homeBenefits } from '../data/homeContent'
+import { useSiteContent } from '../hooks/useSiteContent'
 import { useCars } from '../context/useCars'
-import { apiRequest } from '../services/api'
 import './HomePage.css'
 
 export default function HomePage() {
   const location = useLocation()
   const { cars, loading, error } = useCars()
-  const featuredCars = (cars.some((car) => car.featured) ? cars.filter((car) => car.featured) : cars).slice(0, 3)
-  const [siteData, setSiteData] = useState({ banners: [], carTypes: [] })
-  const [siteError, setSiteError] = useState('')
-
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/site')
-      .then((data) => {
-        if (active) setSiteData(data)
-      })
-      .catch((requestError) => {
-        if (active) setSiteError(requestError.message)
-      })
-    return () => { active = false }
-  }, [])
+  const featuredCars = cars.some((car) => car.featured)
+    ? cars.filter((car) => car.featured)
+    : cars.slice(0, 3)
+  const { data: siteData, error: siteError } = useSiteContent()
 
   useEffect(() => {
     if (location.hash) {

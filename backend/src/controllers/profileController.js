@@ -1,5 +1,6 @@
 import { Car } from '../models/Car.js'
 import { toCarResponse } from '../utils/carResponse.js'
+import { publishSiteUpdate } from '../services/siteUpdates.js'
 
 export async function getProfile(req, res) {
   const user = await req.user.populate('wishlist', 'slug name images')
@@ -39,6 +40,7 @@ export async function updateProfile(req, res) {
     }
   }
   await req.user.save()
+  publishSiteUpdate()
   return res.json({ user: req.user.toJSON() })
 }
 

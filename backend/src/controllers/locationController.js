@@ -1,5 +1,6 @@
 import { Location } from '../models/Location.js'
 import { Booking } from '../models/Booking.js'
+import { publishSiteUpdate } from '../services/siteUpdates.js'
 
 function serializeLocation(location) {
   return { ...location, id: location._id.toString(), _id: undefined }
@@ -33,6 +34,7 @@ export async function createLocation(req, res) {
   const { location, error } = validateLocationInput(req.body || {})
   if (error) return res.status(400).json({ error })
   const created = await Location.create(location)
+  publishSiteUpdate()
   return res.status(201).json({ location: serializeLocation(created.toObject()) })
 }
 
@@ -41,6 +43,7 @@ export async function updateLocation(req, res) {
   if (error) return res.status(400).json({ error })
   const updated = await Location.findByIdAndUpdate(req.params.id, { $set: location }, { new: true, runValidators: true }).lean()
   if (!updated) return res.status(404).json({ error: 'Location not found.' })
+  publishSiteUpdate()
   return res.json({ location: serializeLocation(updated) })
 }
 
@@ -51,5 +54,6 @@ export async function deleteLocation(req, res) {
     return res.status(409).json({ error: 'Locations used by booking history cannot be deleted. Disable it instead.' })
   }
   await location.deleteOne()
+  publishSiteUpdate()
   return res.status(204).end()
 }

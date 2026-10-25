@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCars } from '../context/useCars'
+import { useSiteContent } from '../hooks/useSiteContent'
 import { apiRequest } from '../services/api'
 import './BookingPage.css'
 
@@ -21,9 +22,7 @@ export default function BookingPage() {
   const { user } = useAuth()
   const { cars, loading: carsLoading, error: carsError } = useCars()
   const car = cars.find((item) => item.id === carId)
-  const [siteData, setSiteData] = useState({ addons: [], locations: [], settings: { gstRate: 0.18 } })
-  const [siteLoading, setSiteLoading] = useState(true)
-  const [siteError, setSiteError] = useState('')
+  const { data: siteData, loading: siteLoading, error: siteError, version: siteVersion } = useSiteContent()
   const [dateDefaults] = useState(() => {
     const now = new Date()
     return { today: dateString(now), pickup: addDays(now, 1), returnDate: addDays(now, 3) }
@@ -52,22 +51,7 @@ export default function BookingPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/site')
-      .then((data) => {
-        if (active) setSiteData(data)
-      })
-      .catch((requestError) => {
-        if (active) setSiteError(requestError.message)
-      })
-      .finally(() => {
-        if (active) setSiteLoading(false)
-      })
-    return () => { active = false }
-  }, [])
-
-  const quoteKey = JSON.stringify([carId, pickup, returnDate, location, returnLocation, selectedAddOns, extraKm])
+  const quoteKey = JSON.stringify([carId, pickup, returnDate, location, returnLocation, selectedAddOns, extraKm, siteVersion])
   const pricing = quoteState.key === quoteKey ? quoteState.pricing : null
   const quoteLoading = quoteState.key === quoteKey && quoteState.loading
   const quoteError = quoteState.key === quoteKey ? quoteState.error : ''

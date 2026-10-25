@@ -9,6 +9,7 @@ import { RentalRate } from '../models/RentalRate.js'
 import { ServiceBlock } from '../models/ServiceBlock.js'
 import { Setting } from '../models/Setting.js'
 import { User } from '../models/User.js'
+import { publishSiteUpdate } from '../services/siteUpdates.js'
 import { slugify } from '../utils/slugify.js'
 import { toCarResponse } from '../utils/carResponse.js'
 
@@ -107,6 +108,7 @@ export async function createAdminResource(req, res) {
   if (config.slug) fields.slug = slugify(input.slug || input.name || '')
   if (config.slug && !fields.slug) return res.status(400).json({ error: 'A name is required.' })
   const item = await config.model.create(fields)
+  publishSiteUpdate()
   return res.status(201).json({ item: serialize(item) })
 }
 
@@ -117,6 +119,7 @@ export async function updateAdminResource(req, res) {
   if (!Object.keys(fields).length) return res.status(400).json({ error: 'Provide at least one field to update.' })
   const item = await config.model.findByIdAndUpdate(req.params.id, { $set: fields }, { new: true, runValidators: true })
   if (!item) return res.status(404).json({ error: 'Admin resource not found.' })
+  publishSiteUpdate()
   return res.json({ item: serialize(item) })
 }
 
@@ -130,6 +133,7 @@ export async function deleteAdminResource(req, res) {
   }
   const item = await config.model.findByIdAndDelete(req.params.id)
   if (!item) return res.status(404).json({ error: 'Admin resource not found.' })
+  publishSiteUpdate()
   return res.status(204).end()
 }
 
@@ -156,6 +160,7 @@ export async function updateAdminSettings(req, res) {
     { $set: fields, $setOnInsert: { key: 'general' } },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
   ).lean()
+  publishSiteUpdate()
   return res.json({ settings })
 }
 
@@ -167,6 +172,7 @@ export async function createServiceBlock(req, res) {
   const car = await Car.findOne({ slug: carId })
   if (!car) return res.status(404).json({ error: 'Car not found.' })
   const block = await ServiceBlock.create({ car: car._id, date, reason: typeof reason === 'string' ? reason.trim() : '' })
+  publishSiteUpdate()
   return res.status(201).json({
     item: { ...serialize(block), carId: car.slug, carName: car.name },
   })
@@ -192,6 +198,7 @@ export async function updateServiceBlock(req, res) {
   if (!Object.keys(fields).length) return res.status(400).json({ error: 'Provide a car, date, or reason to update.' })
   const block = await ServiceBlock.findByIdAndUpdate(req.params.id, { $set: fields }, { new: true, runValidators: true }).populate('car', 'slug name').lean()
   if (!block) return res.status(404).json({ error: 'Service block not found.' })
+  publishSiteUpdate()
   return res.json({
     item: { ...serialize(block), carId: block.car?.slug || '', carName: block.car?.name || 'Car unavailable', car: undefined },
   })
@@ -200,6 +207,7 @@ export async function updateServiceBlock(req, res) {
 export async function deleteServiceBlock(req, res) {
   const result = await ServiceBlock.findByIdAndDelete(req.params.id)
   if (!result) return res.status(404).json({ error: 'Service block not found.' })
+  publishSiteUpdate()
   return res.status(204).end()
 }
 
@@ -323,5 +331,6 @@ export async function updateAdminBooking(req, res) {
     booking.status = status
   }
   await booking.save()
-  return res.json({ booking: { id: booking.bookingId, status: booking.status, total: booking.finalTotal ?? booking.pricing.total } })
+    publishSiteUpdate()
+    return res.json({ booking: { id: booking.bookingId, status: booking.status, total: booking.finalTotal ?? booking.pricing.total } })
 }

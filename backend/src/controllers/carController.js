@@ -1,6 +1,7 @@
 import { Car } from '../models/Car.js'
 import { Booking } from '../models/Booking.js'
 import { RentalRate } from '../models/RentalRate.js'
+import { publishSiteUpdate } from '../services/siteUpdates.js'
 import { toCarResponse } from '../utils/carResponse.js'
 import { slugify } from '../utils/slugify.js'
 
@@ -12,6 +13,24 @@ const rateFields = ['dailyRate', 'weekendRate', 'extraKmCharge', 'securityDeposi
 
 function pickFields(source, fields) {
   return Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]))
+}
+
+async function nextBookingsForCarIds(carIds) {
+  if (!carIds.length) return new Map()
+  const today = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10)
+  const bookings = await Booking.find({
+    car: { $in: carIds },
+    status: { $in: ['pending', 'confirmed', 'picked-up'] },
+    returnDate: { $gt: today },
+  }).select('car pickupDate returnDate').sort({ pickupDate: 1 }).lean()
+  const nextBookings = new Map()
+  for (const booking of bookings) {
+    const carId = booking.car.toString()
+    if (!nextBookings.has(carId)) {
+      nextBookings.set(carId, { pickupDate: booking.pickupDate, returnDate: booking.returnDate })
+    }
+  }
+  return nextBookings
 }
 
 function normalizeCarInput(input) {
@@ -48,7 +67,11 @@ export async function listCars(req, res) {
   const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1)
   const pageSize = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 100))
   let cars = await Car.find(filters).populate('rentalRate')
-  let results = cars.map(toCarResponse)
+  const nextBookings = await nextBookingsForCarIds(cars.map((car) => car._id))
+  let results = cars.map((car) => ({
+    ...toCarResponse(car),
+    nextBooking: nextBookings.get(car._id.toString()) || null,
+  }))
 
   if (minPrice !== undefined || maxPrice !== undefined) {
     const minimum = minPrice === undefined ? 0 : Number(minPrice)
@@ -71,9 +94,11 @@ export async function listCars(req, res) {
 
 export async function listAdminCars(_req, res) {
   const cars = await Car.find().populate('rentalRate').sort({ name: 1 }).lean()
+  const nextBookings = await nextBookingsForCarIds(cars.map((car) => car._id))
   return res.json({
     cars: cars.map((car) => ({
       ...toCarResponse(car),
+      nextBooking: nextBookings.get(car._id.toString()) || null,
       registrationNumber: car.registrationNumber || '',
       modelYear: car.modelYear,
       rate: car.rentalRate || null,
@@ -100,6 +125,7 @@ export async function createCar(req, res) {
       ...pickFields({ ...req.body, ...rate }, rateFields),
     })
     car.$set('rentalRate', rentalRate)
+    publishSiteUpdate()
     return res.status(201).json({ car: toCarResponse(car) })
   } catch (error) {
     await Car.deleteOne({ _id: car._id })
@@ -123,6 +149,7 @@ export async function updateCar(req, res) {
   }
 
   const populatedCar = await Car.findById(updatedCar._id).populate('rentalRate')
+  publishSiteUpdate()
   return res.json({ car: toCarResponse(populatedCar) })
 }
 
@@ -134,5 +161,6 @@ export async function deleteCar(req, res) {
   }
   await Car.deleteOne({ _id: car._id })
   await RentalRate.deleteOne({ car: car._id })
+  publishSiteUpdate()
   return res.status(204).end()
 }

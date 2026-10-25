@@ -5,6 +5,7 @@ import { Festival } from '../models/Festival.js'
 import { Location } from '../models/Location.js'
 import { ServiceBlock } from '../models/ServiceBlock.js'
 import { Setting } from '../models/Setting.js'
+import { publishSiteUpdate } from '../services/siteUpdates.js'
 import { toCarResponse } from '../utils/carResponse.js'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -184,6 +185,7 @@ export async function createBooking(req, res) {
     pricing: quote.pricing,
   })
   const result = await Booking.findById(booking._id).populate('car').lean()
+  publishSiteUpdate()
   res.status(201).json({ booking: serializeBooking(result) })
 }
 

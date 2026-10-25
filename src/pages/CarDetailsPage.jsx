@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, CalendarDays, ChevronDown, Gauge, MapPin, Users } from 'lucide-react'
 import { useCars } from '../context/useCars'
+import { useSiteContent } from '../hooks/useSiteContent'
 import { apiRequest } from '../services/api'
 import './CarDetailsPage.css'
 
@@ -10,24 +11,12 @@ export default function CarDetailsPage() {
   const navigate = useNavigate()
   const { cars, loading, error } = useCars()
   const car = cars.find((item) => item.id === carId)
+  const { data: siteData, version: siteVersion, error: locationsError } = useSiteContent()
   const [imageSelection, setImageSelection] = useState({ carId: '', source: '' })
   const [availability, setAvailability] = useState([])
   const [availabilityError, setAvailabilityError] = useState('')
-  const [siteLocations, setSiteLocations] = useState([])
-  const [locationsError, setLocationsError] = useState('')
   const [locationsExpanded, setLocationsExpanded] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/site')
-      .then(({ locations }) => {
-        if (active) setSiteLocations(locations)
-      })
-      .catch((requestError) => {
-        if (active) setLocationsError(requestError.message)
-      })
-    return () => { active = false }
-  }, [])
+  const siteLocations = siteData.locations
 
   useEffect(() => {
     if (!carId) return undefined
@@ -44,7 +33,7 @@ export default function CarDetailsPage() {
         if (active) setAvailabilityError(requestError.message)
       })
     return () => { active = false }
-  }, [carId])
+  }, [carId, siteVersion])
 
   const selectedImage = imageSelection.carId === carId ? imageSelection.source : car?.image
   const carUnavailable = ['under service', 'booked'].includes(car?.status?.toLowerCase().replaceAll('-', ' '))

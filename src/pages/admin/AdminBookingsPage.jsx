@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Check, FileText, Search, ShieldCheck } from 'lucide-react'
 import { apiRequest } from '../../services/api'
+import { subscribeToSiteUpdates } from '../../services/siteUpdates'
 import { StatusPill } from './AdminDashboardPage'
 
 const currency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`
@@ -40,15 +41,34 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     let active = true
-    const params = new URLSearchParams()
-    if (search.trim()) params.set('search', search.trim())
-    if (statusFilter !== 'all') params.set('status', statusFilter)
-    apiRequest(`/api/v1/admin/bookings?${params}`)
-      .then(({ bookings: result }) => { if (active) setBookings(result) })
-      .catch((requestError) => { if (active) setError(requestError.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [search, statusFilter])
+    const refresh = () => {
+      const params = new URLSearchParams()
+      if (search.trim()) params.set('search', search.trim())
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      apiRequest(`/api/v1/admin/bookings?${params}`)
+        .then(({ bookings: result }) => {
+          if (!active) return
+          setBookings(result)
+          if (selectedId && !result.some((booking) => booking.id === selectedId)) {
+            setSelectedId('')
+            setDetail(null)
+          }
+        })
+        .catch((requestError) => { if (active) setError(requestError.message) })
+        .finally(() => { if (active) setLoading(false) })
+      if (selectedId) {
+        apiRequest(`/api/v1/admin/bookings/${encodeURIComponent(selectedId)}`)
+          .then(({ booking }) => { if (active) setDetail(booking) })
+          .catch((requestError) => { if (active) setError(requestError.message) })
+      }
+    }
+    refresh()
+    const unsubscribe = subscribeToSiteUpdates(refresh)
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [search, statusFilter, selectedId])
 
   const selectBooking = async (bookingId) => {
     setSelectedId(bookingId)
@@ -140,12 +160,18 @@ export default function AdminBookingsPage() {
                 <div><FileText size={18} /><span><strong>Driving licence</strong><small>{detail.license.filename || 'No document uploaded'}</small></span></div>
                 <div className="admin-row-actions">
                   {detail.license.data && detail.license.mimeType === 'application/pdf' && <a className="admin-button secondary compact" href={detail.license.data} target="_blank" rel="noreferrer">View PDF</a>}
-                  {detail.license.data && detail.license.mimeType?.startsWith('image/') && <a className="admin-button secondary compact" href={detail.license.data} target="_blank" rel="noreferrer">View image</a>}
                   <button className={`admin-button compact ${detail.licenseVerified ? 'success' : 'secondary'}`} type="button" disabled={saving} onClick={() => updateBooking({ licenseVerified: !detail.licenseVerified }, detail.licenseVerified ? 'Licence verification removed.' : 'Driving licence verified.')}>
                     {detail.licenseVerified ? <Check size={15} /> : <ShieldCheck size={15} />}{detail.licenseVerified ? 'Verified' : 'Verify licence'}
                   </button>
                 </div>
               </div>
+              {detail.license.data && detail.license.mimeType?.startsWith('image/') && (
+                <a className="admin-license-preview-link" href={detail.license.data} target="_blank" rel="noreferrer">
+                  <img className="admin-license-preview" src={detail.license.data} alt={`Driving licence uploaded by ${detail.customer.name}`} />
+                  <span>Open full-size image</span>
+                </a>
+              )}
+              {!detail.license.data && <p className="admin-muted">No licence document was uploaded to this customer profile.</p>}
             </div>
             <div className="admin-detail-block">
               <h3>Trip details</h3>

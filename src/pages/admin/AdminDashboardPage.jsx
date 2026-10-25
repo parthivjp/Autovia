@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ArrowDownLeft, ArrowUpRight, CarFront, CircleDollarSign, UsersRound } from 'lucide-react'
 import { apiRequest } from '../../services/api'
+import { subscribeToSiteUpdates } from '../../services/siteUpdates'
 
 const currency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`
 
@@ -9,23 +10,20 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const load = () => {
-    setLoading(true)
-    setError('')
+  const load = useCallback(() => {
     apiRequest('/api/v1/admin/dashboard')
-      .then(setDashboard)
+      .then((result) => {
+        setDashboard(result)
+        setError('')
+      })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false))
-  }
+  }, [])
 
   useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/admin/dashboard')
-      .then((result) => { if (active) setDashboard(result) })
-      .catch((requestError) => { if (active) setError(requestError.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [])
+    load()
+    return subscribeToSiteUpdates(load)
+  }, [load])
 
   if (loading) return <div className="admin-panel admin-loading">Loading today’s business…</div>
   if (error) return <div className="admin-alert error" role="alert">Unable to load dashboard: {error} <button type="button" onClick={load}>Try again</button></div>

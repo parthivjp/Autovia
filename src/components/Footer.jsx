@@ -1,22 +1,13 @@
 import { ArrowUpRight, CarFront } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiRequest } from '../services/api'
+import { useSiteContent } from '../hooks/useSiteContent'
 import './Footer.css'
 
 const currentYear = new Date().getFullYear()
 
 export default function Footer() {
-  const [settings, setSettings] = useState({ businessName: 'Autovia' })
-  const [settingsError, setSettingsError] = useState('')
-
-  useEffect(() => {
-    let active = true
-    apiRequest('/api/v1/site')
-      .then(({ settings: result }) => { if (active) setSettings(result) })
-      .catch((requestError) => { if (active) setSettingsError(requestError.message) })
-    return () => { active = false }
-  }, [])
+  const { data, error: settingsError } = useSiteContent()
+  const settings = data.settings
 
   return (
     <footer className="site-footer">

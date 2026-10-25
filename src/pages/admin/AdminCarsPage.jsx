@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { apiRequest } from '../../services/api'
+import { subscribeToSiteUpdates } from '../../services/siteUpdates'
 
 const blankForm = {
   name: '', registrationNumber: '', description: '', type: '', fuel: 'petrol', transmission: 'manual',
@@ -9,6 +10,9 @@ const blankForm = {
   package100: 500, package250: 1000, images: [],
 }
 const currency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`
+const displayCarStatus = (car) => (
+  car.status.toLowerCase().replaceAll('-', ' ') === 'under service' ? car.status : car.nextBooking ? 'Booked' : car.status
+)
 const readImage = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader()
   reader.onload = () => resolve(reader.result)
@@ -41,15 +45,23 @@ export default function AdminCarsPage() {
 
   useEffect(() => {
     let active = true
-    Promise.all([apiRequest('/api/v1/admin/cars'), apiRequest('/api/v1/admin/resources')])
-      .then(([carResult, resourceResult]) => {
-        if (!active) return
-        setCars(carResult.cars)
-        setTypes(resourceResult.carTypes.filter((type) => type.active))
-      })
-      .catch((requestError) => { if (active) setError(requestError.message) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
+    const refresh = () => {
+      Promise.all([apiRequest('/api/v1/admin/cars'), apiRequest('/api/v1/admin/resources')])
+        .then(([carResult, resourceResult]) => {
+          if (!active) return
+          setCars(carResult.cars)
+          setTypes(resourceResult.carTypes.filter((type) => type.active))
+          setError('')
+        })
+        .catch((requestError) => { if (active) setError(requestError.message) })
+        .finally(() => { if (active) setLoading(false) })
+    }
+    refresh()
+    const unsubscribe = subscribeToSiteUpdates(refresh)
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [])
 
   const resetForm = () => {
@@ -216,15 +228,21 @@ export default function AdminCarsPage() {
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead><tr><th>Vehicle</th><th>Registration</th><th>Category</th><th>Daily / weekend</th><th>Free km</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody>{visibleCars.map((car) => (
-                <tr key={car.id}>
-                  <td><div className="admin-car-cell">{car.image && <img src={car.image} alt="" />}<strong>{car.name}</strong></div></td>
-                  <td className="admin-mono">{car.registrationNumber || '—'}</td><td>{car.category}</td>
-                  <td>{currency(car.pricePerDay)} / {currency(car.weekendRate)}</td><td>{car.freeKm} km/day</td>
-                  <td><span className={`admin-status ${car.status.toLowerCase().replaceAll(' ', '').replaceAll('-', '')}`}>{car.status}</span></td>
-                  <td><div className="admin-row-actions"><button className="admin-icon-button" type="button" onClick={() => startEdit(car)} aria-label={`Edit ${car.name}`}><Pencil size={16} /></button><button className="admin-icon-button danger" type="button" onClick={() => deleteCar(car)} aria-label={`Delete ${car.name}`}><Trash2 size={16} /></button></div></td>
-                </tr>
-              ))}</tbody>
+              <tbody>{visibleCars.map((car) => {
+                const status = displayCarStatus(car)
+                return (
+                  <tr key={car.id}>
+                    <td><div className="admin-car-cell">{car.image && <img src={car.image} alt="" />}<strong>{car.name}</strong></div></td>
+                    <td className="admin-mono">{car.registrationNumber || '—'}</td><td>{car.category}</td>
+                    <td>{currency(car.pricePerDay)} / {currency(car.weekendRate)}</td><td>{car.freeKm} km/day</td>
+                    <td>
+                      <span className={`admin-status ${status.toLowerCase().replaceAll(' ', '').replaceAll('-', '')}`}>{status}</span>
+                      {car.nextBooking && status === 'Booked' && <small className="admin-car-booking-dates">{car.nextBooking.pickupDate} – {car.nextBooking.returnDate}</small>}
+                    </td>
+                    <td><div className="admin-row-actions"><button className="admin-icon-button" type="button" onClick={() => startEdit(car)} aria-label={`Edit ${car.name}`}><Pencil size={16} /></button><button className="admin-icon-button danger" type="button" onClick={() => deleteCar(car)} aria-label={`Delete ${car.name}`}><Trash2 size={16} /></button></div></td>
+                  </tr>
+                )
+              })}</tbody>
             </table>
           </div>
         ) : <div className="admin-empty">No matching cars.</div>}

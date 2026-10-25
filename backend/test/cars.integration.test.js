@@ -24,6 +24,31 @@ let customerToken
 let adminBookingId
 let adminCarId
 
+async function openSiteUpdateStream() {
+  const response = await fetch(`${baseUrl}/api/v1/site/events`)
+  assert.equal(response.status, 200)
+  assert.match(response.headers.get('content-type'), /text\/event-stream/)
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  const readEvent = async (eventName) => {
+    let buffer = ''
+    while (!buffer.includes(`event: ${eventName}`)) {
+      let timeout
+      const chunk = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${eventName} event.`)), 3000)
+        }),
+      ]).finally(() => clearTimeout(timeout))
+      assert.equal(chunk.done, false)
+      buffer += decoder.decode(chunk.value, { stream: true })
+    }
+    return buffer
+  }
+  assert.match(await readEvent('connected'), /event: connected/)
+  return { waitForUpdate: () => readEvent('site-updated'), cancel: () => reader.cancel() }
+}
+
 before(async () => {
   process.env.JWT_SECRET = 'integration-test-secret-that-is-long-enough'
   await mongoose.connect(mongoUri)
@@ -137,6 +162,13 @@ test('customer registration hashes passwords and never grants an admin role', as
   assert.equal(registration.user.drivingLicenseDocument.filename, 'licence.png')
   assert.equal(registration.user.drivingLicenseDocument.data, undefined)
   assert.ok(registration.token)
+  const storedUser = await User.findOne({ email: 'new-customer@test.local' }).select('+drivingLicenseDocument.data').lean()
+  assert.equal(storedUser.drivingLicenseDocument.data, 'data:image/png;base64,aGVsbG8=')
+  const registeredProfileResponse = await fetch(`${baseUrl}/api/v1/profile/me`, {
+    headers: { authorization: `Bearer ${registration.token}` },
+  })
+  assert.equal(registeredProfileResponse.status, 200)
+  assert.equal((await registeredProfileResponse.json()).user.drivingLicenseDocument.data, undefined)
 
   const loginResponse = await fetch(`${baseUrl}/api/v1/auth/login`, {
     method: 'POST',
@@ -321,6 +353,9 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   assert.equal(pricing.total, 7139)
   assert.equal(pricing.securityDeposit, 5000)
 
+  const bookingEvents = await openSiteUpdateStream()
+  let booking
+  try {
   const bookingResponse = await fetch(`${baseUrl}/api/v1/bookings`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${customerToken}` },
@@ -338,7 +373,11 @@ test('customer site content, server quotes, bookings, availability, and wishlist
     }),
   })
   assert.equal(bookingResponse.status, 201)
-  const { booking } = await bookingResponse.json()
+    ;({ booking } = await bookingResponse.json())
+    await bookingEvents.waitForUpdate()
+  } finally {
+    await bookingEvents.cancel()
+  }
   adminBookingId = booking.id
   adminCarId = car.slug
   assert.equal(booking.total, 7139)
@@ -347,6 +386,8 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   assert.equal(booking.paymentMethod, 'Pay at Pickup')
   assert.equal(await Booking.countDocuments({ bookingId: booking.id }), 1)
   assert.equal(await Booking.countDocuments({ location: newLocation._id, returnLocation: testLocation._id }), 1)
+  const customerCarList = await fetch(`${baseUrl}/api/v1/cars?search=${encodeURIComponent(car.name)}`).then((response) => response.json())
+  assert.deepEqual(customerCarList.cars[0].nextBooking, { pickupDate: '2027-01-01', returnDate: '2027-01-04' })
 
   const deleteBookedCarResponse = await fetch(`${baseUrl}/api/v1/cars/${car.slug}`, {
     method: 'DELETE',
@@ -420,12 +461,39 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(customerResourceWrite.status, 403)
 
-  const typeCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...adminHeaders },
-    body: JSON.stringify({ name: 'Estate', active: true }),
-  })
-  assert.equal(typeCreateResponse.status, 201)
+  const eventStream = await fetch(`${baseUrl}/api/v1/site/events`)
+  assert.equal(eventStream.status, 200)
+  assert.match(eventStream.headers.get('content-type'), /text\/event-stream/)
+  const eventReader = eventStream.body.getReader()
+  const eventDecoder = new TextDecoder()
+  const readEvent = async (eventName) => {
+    let buffer = ''
+    while (!buffer.includes(`event: ${eventName}`)) {
+      let timeout
+      const chunk = await Promise.race([
+        eventReader.read(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`Timed out waiting for ${eventName} event.`)), 3000)
+        }),
+      ]).finally(() => clearTimeout(timeout))
+      assert.equal(chunk.done, false)
+      buffer += eventDecoder.decode(chunk.value, { stream: true })
+    }
+    return buffer
+  }
+  let typeCreateResponse
+  try {
+    assert.match(await readEvent('connected'), /event: connected/)
+    typeCreateResponse = await fetch(`${baseUrl}/api/v1/admin/resources/car-types`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...adminHeaders },
+      body: JSON.stringify({ name: 'Estate', active: true }),
+    })
+    assert.equal(typeCreateResponse.status, 201)
+    assert.match(await readEvent('site-updated'), /event: site-updated/)
+  } finally {
+    await eventReader.cancel()
+  }
   const { item: estateType } = await typeCreateResponse.json()
   assert.equal(estateType.slug, 'estate')
   const siteWithEstateType = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
@@ -548,6 +616,7 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   assert.equal(carListResponse.status, 200)
   const adminCars = await carListResponse.json()
   assert.equal(adminCars.cars.find((car) => car.id === adminCarId).registrationNumber, '')
+  assert.deepEqual(adminCars.cars.find((car) => car.id === adminCarId).nextBooking, { pickupDate: '2027-01-01', returnDate: '2027-01-04' })
 
   const serviceCreateResponse = await fetch(`${baseUrl}/api/v1/admin/service-blocks`, {
     method: 'POST',
@@ -669,6 +738,10 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   assert.equal(returnedBooking.licenseVerified, true)
   assert.equal(returnedBooking.extraKmDrivenCharge, 1500)
   assert.equal(returnedBooking.lateFee, 1000)
+  const myReturnedBooking = await fetch(`${baseUrl}/api/v1/bookings/mine`, {
+    headers: { authorization: ['Bearer', customerToken].join(' ') },
+  }).then((response) => response.json())
+  assert.equal(myReturnedBooking.bookings.find((item) => item.id === adminBookingId).status, 'returned')
   const returnedDatesQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -699,12 +772,16 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   })
   assert.equal(cancellableBookingResponse.status, 201)
   const cancellableBooking = (await cancellableBookingResponse.json()).booking
+  const reservedCarList = await fetch(`${baseUrl}/api/v1/cars?search=Booking%20Test%20Car`).then((response) => response.json())
+  assert.deepEqual(reservedCarList.cars[0].nextBooking, { pickupDate: '2027-01-05', returnDate: '2027-01-06' })
   const cancellationResponse = await fetch(`${baseUrl}/api/v1/admin/bookings/${cancellableBooking.id}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', ...adminHeaders },
     body: JSON.stringify({ status: 'cancelled' }),
   })
   assert.equal(cancellationResponse.status, 200)
+  const releasedCarList = await fetch(`${baseUrl}/api/v1/cars?search=Booking%20Test%20Car`).then((response) => response.json())
+  assert.equal(releasedCarList.cars[0].nextBooking, null)
   const releasedDatesQuote = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

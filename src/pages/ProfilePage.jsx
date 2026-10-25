@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiRequest } from '../services/api'
+import { subscribeToSiteUpdates } from '../services/siteUpdates'
 import './ProfilePage.css'
 
 export default function ProfilePage() {
@@ -22,6 +23,11 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!user) return undefined
     let active = true
+    const refreshBookings = () => {
+      apiRequest('/api/v1/bookings/mine')
+        .then(({ bookings: result }) => { if (active) setBookings(result) })
+        .catch((requestError) => { if (active) setError(requestError.message) })
+    }
     Promise.all([
       apiRequest('/api/v1/profile/me'),
       apiRequest('/api/v1/bookings/mine'),
@@ -42,7 +48,11 @@ export default function ProfilePage() {
       .finally(() => {
         if (active) setLoading(false)
       })
-    return () => { active = false }
+    const unsubscribe = subscribeToSiteUpdates(refreshBookings)
+    return () => {
+      active = false
+      unsubscribe()
+    }
   }, [user])
 
   if (!user) return <Navigate to="/login" replace />
