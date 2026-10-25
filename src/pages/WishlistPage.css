@@ -1,0 +1,17 @@
+.empty-state {
+  display: grid;
+  place-items: center;
+  gap: 18px;
+  min-height: 220px;
+  background: rgba(255,255,255,0.8);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.wishlist-image {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+}

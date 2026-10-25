@@ -1,0 +1,62 @@
+.profile-page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.profile-card {
+  background: rgba(255,255,255,0.86);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 26px;
+}
+
+.profile-summary-card h1 {
+  margin-top: 10px;
+  margin-bottom: 18px;
+}
+
+.profile-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.booking-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.booking-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  padding: 16px;
+  background: rgba(17,24,39,0.02);
+  border-radius: var(--radius-md);
+}
+
+.booking-meta {
+  text-align: right;
+}
+
+.status-tag {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 0.42rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 760px) {
+  .profile-page {
+    grid-template-columns: 1fr;
+  }
+}

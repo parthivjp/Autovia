@@ -1,0 +1,39 @@
+.confirmation-page {
+  display: grid;
+  place-items: center;
+  min-height: 70vh;
+}
+
+.confirmation-card {
+  width: min(100%, 620px);
+  background: rgba(255,255,255,0.86);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  padding: 28px;
+}
+
+.success-state h1 {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.confirmation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 22px 0 24px;
+}
+
+.confirmation-grid div {
+  background: rgba(17,24,39,0.02);
+  border: 1px solid rgba(17,24,39,0.04);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.confirmation-grid span {
+  color: var(--text-muted);
+}

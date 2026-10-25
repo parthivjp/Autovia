@@ -1,0 +1,196 @@
+{
+  "settings": {
+    "gstPercent": 18,
+    "businessName": "DriveNGo Rentals",
+    "contactPhone": "+91 98765 43210",
+    "contactEmail": "hello@drivengo.in",
+    "lateReturnChargePerHour": 250,
+    "cancellationCutoffHours": 24,
+    "pickupAddress": "MG Road, Bengaluru"
+  },
+  "banners": [
+    {
+      "id": "banner-1",
+      "title": "Weekend escapes made easy",
+      "subtitle": "Choose a self-drive car from hatchbacks to premium SUVs.",
+      "image": "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80",
+      "active": true
+    },
+    {
+      "id": "banner-2",
+      "title": "Book flexible city rides",
+      "subtitle": "Daily rates, weekend surcharges, and festival pricing are all managed from the admin panel.",
+      "image": "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
+      "active": true
+    }
+  ],
+  "carTypes": [
+    { "id": "hatchback", "name": "Hatchback" },
+    { "id": "sedan", "name": "Sedan" },
+    { "id": "suv", "name": "SUV" },
+    { "id": "muv", "name": "MUV" }
+  ],
+  "fuelTypes": ["petrol", "diesel", "CNG", "electric"],
+  "transmissions": ["manual", "automatic"],
+  "locations": [
+    { "id": "loc-bengaluru", "name": "Bengaluru Airport" },
+    { "id": "loc-mumbai", "name": "Mumbai Central" },
+    { "id": "loc-delhi", "name": "Delhi Connaught Place" },
+    { "id": "loc-goa", "name": "Goa Panaji" }
+  ],
+  "addons": [
+    { "id": "child-seat", "name": "Child Seat", "price": 450 },
+    { "id": "gps", "name": "GPS", "price": 350 },
+    { "id": "extra-driver", "name": "Extra Driver", "price": 600 },
+    { "id": "full-insurance", "name": "Full Insurance", "price": 999 }
+  ],
+  "adminUser": {
+    "id": "admin-1",
+    "name": "Admin User",
+    "email": "admin@drivengo.in",
+    "passwordHash": "$2a$10$0VCs1z0jX0qACF002H0h6.mN2CTZ7sPOc7R/Ci4TzeQ6km4SJ3kA6",
+    "role": "admin"
+  },
+  "users": [
+    {
+      "id": "user-1",
+      "name": "Priya Shah",
+      "email": "customer@example.com",
+      "phone": "+91 99887 66554",
+      "passwordHash": "$2a$10$dfDk4b4x3i7dA9JmF9xWzuQg6V3pG1J2QmtUYwyhP4D8f4uYzR6U2",
+      "role": "customer",
+      "drivingLicense": "PRIYA-4455",
+      "address": "Koramangala, Bengaluru"
+    }
+  ],
+  "cars": [
+    {
+      "id": "car-1",
+      "name": "Maruti Swift Dzire",
+      "type": "sedan",
+      "fuel": "petrol",
+      "transmission": "manual",
+      "seats": 5,
+      "year": 2023,
+      "registrationNumber": "KA01AB1234",
+      "freeKmLimit": 250,
+      "featured": true,
+      "image": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=1200&q=80",
+      "status": "available",
+      "dailyRate": 2200,
+      "weekendRate": 2900,
+      "extraKmCharge": 18,
+      "securityDeposit": 5000,
+      "pickupLocations": ["loc-bengaluru", "loc-delhi"],
+      "serviceBlocks": [
+        "2026-10-28",
+        "2026-10-29"
+      ]
+    },
+    {
+      "id": "car-2",
+      "name": "Hyundai Creta",
+      "type": "suv",
+      "fuel": "diesel",
+      "transmission": "automatic",
+      "seats": 5,
+      "year": 2024,
+      "registrationNumber": "KA05CD4567",
+      "freeKmLimit": 300,
+      "featured": true,
+      "image": "https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=1200&q=80",
+      "status": "available",
+      "dailyRate": 3200,
+      "weekendRate": 4200,
+      "extraKmCharge": 25,
+      "securityDeposit": 7000,
+      "pickupLocations": ["loc-bengaluru", "loc-goa"],
+      "serviceBlocks": []
+    },
+    {
+      "id": "car-3",
+      "name": "Tata Nexon",
+      "type": "suv",
+      "fuel": "diesel",
+      "transmission": "manual",
+      "seats": 5,
+      "year": 2022,
+      "registrationNumber": "MH02EF7890",
+      "freeKmLimit": 250,
+      "featured": false,
+      "image": "https://images.unsplash.com/photo-1494905998402-395d579af36f?auto=format&fit=crop&w=1200&q=80",
+      "status": "available",
+      "dailyRate": 2600,
+      "weekendRate": 3400,
+      "extraKmCharge": 20,
+      "securityDeposit": 6000,
+      "pickupLocations": ["loc-mumbai", "loc-goa"],
+      "serviceBlocks": ["2026-10-30"]
+    },
+    {
+      "id": "car-4",
+      "name": "Mahindra Bolero",
+      "type": "muv",
+      "fuel": "diesel",
+      "transmission": "manual",
+      "seats": 7,
+      "year": 2021,
+      "registrationNumber": "DL04GH1122",
+      "freeKmLimit": 320,
+      "featured": true,
+      "image": "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=1200&q=80",
+      "status": "available",
+      "dailyRate": 3900,
+      "weekendRate": 4900,
+      "extraKmCharge": 28,
+      "securityDeposit": 8000,
+      "pickupLocations": ["loc-delhi", "loc-mumbai"],
+      "serviceBlocks": []
+    },
+    {
+      "id": "car-5",
+      "name": "Renault Kwid",
+      "type": "hatchback",
+      "fuel": "petrol",
+      "transmission": "manual",
+      "seats": 5,
+      "year": 2024,
+      "registrationNumber": "KA19KL8899",
+      "freeKmLimit": 200,
+      "featured": false,
+      "image": "https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&w=1200&q=80",
+      "status": "available",
+      "dailyRate": 1750,
+      "weekendRate": 2300,
+      "extraKmCharge": 15,
+      "securityDeposit": 4000,
+      "pickupLocations": ["loc-bengaluru", "loc-goa"],
+      "serviceBlocks": []
+    }
+  ],
+  "festivalDates": [
+    "2026-11-14",
+    "2026-11-15",
+    "2026-12-25"
+  ],
+  "bookings": [
+    {
+      "id": "booking-1",
+      "carId": "car-2",
+      "userId": "user-1",
+      "pickupDate": "2026-10-27",
+      "returnDate": "2026-10-29",
+      "pickupLocation": "loc-bengaluru",
+      "returnLocation": "loc-bengaluru",
+      "status": "Confirmed",
+      "total": 10500,
+      "driverName": "Priya Shah",
+      "driverPhone": "+91 99887 66554",
+      "addOns": ["gps", "full-insurance"],
+      "extraKmPackage": 250,
+      "kmsDriven": 0,
+      "finalBill": 0
+    }
+  ],
+  "wishlist": ["car-4"]
+}
