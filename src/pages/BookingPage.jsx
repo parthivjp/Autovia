@@ -1,31 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCars } from '../context/useCars'
+import { apiRequest } from '../services/api'
 import './BookingPage.css'
 
-const ADD_ONS = [
-  { id: 'child-seat', label: 'Child seat', price: 300 },
-  { id: 'gps', label: 'GPS navigation', price: 250 },
-  { id: 'extra-driver', label: 'Additional driver', price: 500 },
-  { id: 'insurance', label: 'Full insurance', price: 800 },
-]
-
-const EXTRA_KM_PACKAGES = [
-  { id: 'none', label: 'No extra kilometres', km: 0, price: 0 },
-  { id: '100-km', label: '100 extra km', km: 100, price: 500 },
-  { id: '250-km', label: '250 extra km', km: 250, price: 1000 },
-]
-
-const FESTIVAL_DATES = ['2026-10-31', '2026-11-01', '2026-12-25']
-const GST_RATE = 0.18
-const FESTIVAL_RATE = 1.35
-
 function dateString(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 function addDays(date, days) {
@@ -38,8 +19,10 @@ export default function BookingPage() {
   const { carId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { cars, loading, error: carsError } = useCars()
+  const { cars, loading: carsLoading, error: carsError } = useCars()
   const car = cars.find((item) => item.id === carId)
+  const [siteData, setSiteData] = useState({ addons: [], locations: [], settings: { gstRate: 0.18 } })
+  const [siteError, setSiteError] = useState('')
   const [dateDefaults] = useState(() => {
     const now = new Date()
     return { today: dateString(now), pickup: addDays(now, 1), returnDate: addDays(now, 3) }
@@ -49,58 +32,75 @@ export default function BookingPage() {
   const [pickupTime, setPickupTime] = useState('10:00')
   const [returnTime, setReturnTime] = useState('10:00')
   const [selectedLocation, setSelectedLocation] = useState('')
-  const location = car?.pickupLocations.includes(selectedLocation) ? selectedLocation : car?.pickupLocations[0] || ''
+  const availableLocations = siteData.locations.filter((item) => car?.pickupLocations.includes(item.name))
+  const location = availableLocations.some((item) => item.name === selectedLocation)
+    ? selectedLocation
+    : availableLocations[0]?.name || ''
+  const [selectedReturnLocation, setSelectedReturnLocation] = useState('')
+  const returnLocation = availableLocations.some((item) => item.name === selectedReturnLocation)
+    ? selectedReturnLocation
+    : location
   const [selectedAddOns, setSelectedAddOns] = useState([])
-  const [extraKmPackage, setExtraKmPackage] = useState('none')
+  const [extraKm, setExtraKm] = useState('0')
   const [driver, setDriver] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
     license: user?.drivingLicense || '',
   })
+  const [quoteState, setQuoteState] = useState({ key: '', pricing: null, loading: false, error: '' })
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const pricing = useMemo(() => {
-    if (!car) {
-      return { days: 1, rental: 0, extraKm: 0, extraKmTotal: 0, addOnsTotal: 0, gst: 0, total: 0, deposit: 0 }
+  useEffect(() => {
+    let active = true
+    apiRequest('/api/v1/site')
+      .then((data) => {
+        if (active) setSiteData(data)
+      })
+      .catch((requestError) => {
+        if (active) setSiteError(requestError.message)
+      })
+    return () => { active = false }
+  }, [])
+
+  const quoteKey = JSON.stringify([carId, pickup, returnDate, location, returnLocation, selectedAddOns, extraKm])
+  const pricing = quoteState.key === quoteKey ? quoteState.pricing : null
+  const quoteLoading = quoteState.key === quoteKey && quoteState.loading
+  const quoteError = quoteState.key === quoteKey ? quoteState.error : ''
+
+  useEffect(() => {
+    if (!car || !pickup || !returnDate || returnDate <= pickup || !location) return undefined
+    let active = true
+    const timer = window.setTimeout(() => {
+      setQuoteState({ key: quoteKey, pricing: null, loading: true, error: '' })
+      apiRequest('/api/v1/bookings/quote', {
+        method: 'POST',
+        body: JSON.stringify({
+          carId,
+          pickupDate: pickup,
+          returnDate,
+          location,
+          returnLocation,
+          addonIds: selectedAddOns,
+          extraKm: Number(extraKm),
+        }),
+      })
+        .then(({ pricing: quote }) => {
+          if (active) setQuoteState({ key: quoteKey, pricing: quote, loading: false, error: '' })
+        })
+        .catch((requestError) => {
+          if (active) setQuoteState({ key: quoteKey, pricing: null, loading: false, error: requestError.message })
+        })
+    }, 150)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
     }
+  }, [car, carId, pickup, returnDate, location, returnLocation, selectedAddOns, extraKm, quoteKey])
 
-    const start = new Date(`${pickup}T00:00:00`)
-    const end = new Date(`${returnDate}T00:00:00`)
-    const days = Math.max(1, Math.ceil((end - start) / 86400000))
-    let rental = 0
+  const selectedPackage = car?.extraKmPackages?.find((item) => item.km === Number(extraKm))
 
-    for (let index = 0; index < days; index += 1) {
-      const day = new Date(start)
-      day.setDate(day.getDate() + index)
-      const key = dateString(day)
-      const isWeekend = day.getDay() === 0 || day.getDay() === 6
-      const rate = FESTIVAL_DATES.includes(key)
-        ? Math.round(car.weekendRate * FESTIVAL_RATE)
-        : isWeekend ? car.weekendRate : car.pricePerDay
-      rental += rate
-    }
-
-    const packageChoice = EXTRA_KM_PACKAGES.find((item) => item.id === extraKmPackage)
-    const addOnsTotal = ADD_ONS
-      .filter((item) => selectedAddOns.includes(item.id))
-      .reduce((sum, item) => sum + item.price, 0)
-    const extraKmTotal = packageChoice?.price || 0
-    const taxableTotal = rental + extraKmTotal + addOnsTotal
-    const gst = Math.round(taxableTotal * GST_RATE)
-
-    return {
-      days,
-      rental,
-      extraKm: packageChoice?.km || 0,
-      extraKmTotal,
-      addOnsTotal,
-      gst,
-      total: taxableTotal + gst,
-      deposit: car.securityDeposit || 5000,
-    }
-  }, [car, pickup, returnDate, extraKmPackage, selectedAddOns])
-
-  if (loading) return <div className="page-shell"><div className="empty-state">Loading booking details…</div></div>
+  if (carsLoading) return <div className="page-shell"><div className="empty-state">Loading booking details…</div></div>
   if (carsError) return <div className="page-shell"><div className="empty-state" role="alert">Unable to load cars: {carsError}</div></div>
   if (!car) {
     return (
@@ -119,7 +119,7 @@ export default function BookingPage() {
     ))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
     if (!user) {
@@ -134,34 +134,37 @@ export default function BookingPage() {
       setError('Enter the driver name, phone number, and licence details.')
       return
     }
-
-    const booking = {
-      id: `AUT-${Date.now()}`,
-      car,
-      pickup,
-      returnDate,
-      pickupTime,
-      returnTime,
-      location,
-      driver,
-      addOns: ADD_ONS.filter((item) => selectedAddOns.includes(item.id)),
-      extraKm: pricing.extraKm,
-      rentalTotal: pricing.rental,
-      gst: pricing.gst,
-      deposit: pricing.deposit,
-      total: pricing.total,
-      status: 'Pending',
-      paymentMethod: 'Pay at Pickup',
-      createdAt: new Date().toISOString(),
-      userEmail: user.email,
+    if (!pricing) {
+      setError(quoteError || 'Wait for a valid price quote before placing your booking.')
+      return
     }
 
-    const bookings = JSON.parse(localStorage.getItem('autovia-bookings') || '[]')
-    bookings.unshift(booking)
-    localStorage.setItem('autovia-bookings', JSON.stringify(bookings))
-    localStorage.setItem('autovia-last-booking', JSON.stringify(booking))
-    navigate('/confirmation')
+    setSaving(true)
+    try {
+      const result = await apiRequest('/api/v1/bookings', {
+        method: 'POST',
+        body: JSON.stringify({
+          carId,
+          pickupDate: pickup,
+          returnDate,
+          pickupTime,
+          returnTime,
+          location,
+          returnLocation,
+          driver,
+          addonIds: selectedAddOns,
+          extraKm: Number(extraKm),
+        }),
+      })
+      navigate(`/confirmation/${result.booking.id}`, { state: { booking: result.booking } })
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSaving(false)
+    }
   }
+
+  const formatCurrency = (amount = 0) => `₹${Number(amount).toLocaleString('en-IN')}`
 
   return (
     <div className="page-shell booking-page">
@@ -169,6 +172,7 @@ export default function BookingPage() {
         <div className="booking-form-wrap">
           <span className="eyebrow">Reserve your car</span>
           <h1>{car.name}</h1>
+          {siteError && <p className="form-error" role="alert">Unable to load booking options: {siteError}</p>}
           <form className="booking-form" onSubmit={handleSubmit}>
             <h2>Trip details</h2>
             <div className="form-grid booking-fields">
@@ -185,9 +189,16 @@ export default function BookingPage() {
                 <input type="time" value={returnTime} onChange={(event) => setReturnTime(event.target.value)} required />
               </label>
               <label className="booking-location">Pickup location
-                <select value={location} onChange={(event) => setSelectedLocation(event.target.value)}>
-                  {car.pickupLocations.map((place) => (
-                    <option key={place} value={place}>{place}</option>
+                <select value={location} onChange={(event) => setSelectedLocation(event.target.value)} required>
+                  {availableLocations.map((place) => (
+                    <option key={place.id} value={place.name}>{place.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="booking-location">Return location
+                <select value={returnLocation} onChange={(event) => setSelectedReturnLocation(event.target.value)} required>
+                  {availableLocations.map((place) => (
+                    <option key={place.id} value={place.name}>{place.name}</option>
                   ))}
                 </select>
               </label>
@@ -196,28 +207,30 @@ export default function BookingPage() {
             <h2>Extra kilometres</h2>
             <label className="booking-select">
               Package
-              <select value={extraKmPackage} onChange={(event) => setExtraKmPackage(event.target.value)}>
-                {EXTRA_KM_PACKAGES.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}{item.price ? ` — ₹${item.price.toLocaleString('en-IN')}` : ''}
+              <select value={extraKm} onChange={(event) => setExtraKm(event.target.value)}>
+                {(car.extraKmPackages || []).map((item) => (
+                  <option key={item.km} value={item.km}>
+                    {item.label}{item.price ? ` — ${formatCurrency(item.price)}` : ''}
                   </option>
                 ))}
               </select>
             </label>
 
             <h2>Add-ons</h2>
+            {siteError && <p className="form-error" role="alert">Unable to load add-ons: {siteError}</p>}
             <div className="booking-addons">
-              {ADD_ONS.map((item) => (
+              {siteData.addons.map((item) => (
                 <label className="addon-option" key={item.id}>
                   <input
                     type="checkbox"
                     checked={selectedAddOns.includes(item.id)}
                     onChange={() => toggleAddOn(item.id)}
                   />
-                  <span>{item.label}</span>
-                  <strong>₹{item.price.toLocaleString('en-IN')}</strong>
+                  <span>{item.name}</span>
+                  <strong>{formatCurrency(item.price)}</strong>
                 </label>
               ))}
+              {!siteData.addons.length && !siteError && <p>No add-ons are currently available.</p>}
             </div>
 
             <h2>Driver details</h2>
@@ -237,20 +250,23 @@ export default function BookingPage() {
               <strong>Payment</strong>
               <span>Pay at Pickup</span>
             </div>
+            {quoteError && <p className="form-error" role="alert">{quoteError}</p>}
             {error && <p className="form-error" role="alert">{error}</p>}
-            <button type="submit" className="btn btn-primary">Review booking</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || quoteLoading || !pricing}>
+              {saving ? 'Placing booking…' : 'Confirm booking'}
+            </button>
           </form>
         </div>
 
         <aside className="summary-card">
           <h2>Live price summary</h2>
-          <div className="summary-row"><span>Daily rate</span><strong>₹{car.pricePerDay.toLocaleString('en-IN')} × {pricing.days} days</strong></div>
-          <div className="summary-row"><span>Weekend / festival rates</span><strong>₹{pricing.rental.toLocaleString('en-IN')}</strong></div>
-          <div className="summary-row"><span>Extra {pricing.extraKm} km</span><strong>₹{pricing.extraKmTotal.toLocaleString('en-IN')}</strong></div>
-          <div className="summary-row"><span>Add-ons</span><strong>₹{pricing.addOnsTotal.toLocaleString('en-IN')}</strong></div>
-          <div className="summary-row"><span>GST (18%)</span><strong>₹{pricing.gst.toLocaleString('en-IN')}</strong></div>
-          <div className="summary-total"><span>Total payable</span><strong>₹{pricing.total.toLocaleString('en-IN')}</strong></div>
-          <div className="summary-row deposit-row"><span>Refundable security deposit</span><strong>₹{pricing.deposit.toLocaleString('en-IN')}</strong></div>
+          <div className="summary-row"><span>Daily rate × {pricing?.days || '—'} days</span><strong>{formatCurrency(pricing?.rental)}</strong></div>
+          <div className="summary-row"><span>Weekend / festival rates</span><strong>Included above</strong></div>
+          <div className="summary-row"><span>Extra {selectedPackage?.km || 0} km</span><strong>{formatCurrency(pricing?.extraKm)}</strong></div>
+          <div className="summary-row"><span>Add-ons</span><strong>{formatCurrency(pricing?.addOns)}</strong></div>
+          <div className="summary-row"><span>GST ({Math.round((siteData.settings.gstRate || 0) * 100)}%)</span><strong>{formatCurrency(pricing?.gst)}</strong></div>
+          <div className="summary-total"><span>Total payable</span><strong>{quoteLoading ? 'Updating…' : formatCurrency(pricing?.total)}</strong></div>
+          <div className="summary-row deposit-row"><span>Refundable security deposit</span><strong>{formatCurrency(pricing?.securityDeposit ?? car.securityDeposit)}</strong></div>
           <p className="deposit-note">The security deposit is shown separately and is not included in the trip total.</p>
         </aside>
       </div>

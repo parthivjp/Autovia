@@ -1,6 +1,6 @@
 # Autovia Car Rental
 
-Autovia is a customer-facing car rental site with a React/Vite frontend and a separate Express/MongoDB backend. The current backend milestone moves car browsing and customer authentication to MongoDB; there is no admin interface.
+Autovia is a customer-facing car rental site with a React/Vite frontend and a separate Express/MongoDB backend. Customer-facing catalog, pricing, availability, accounts, wishlists, and reservations use MongoDB-backed APIs. There is no admin interface.
 
 ## Stack
 
@@ -28,7 +28,7 @@ Autovia is a customer-facing car rental site with a React/Vite frontend and a se
    mongodb://127.0.0.1:27017/autovia
    ```
 
-4. Seed the seven demo cars and their rental rates:
+4. Seed the initial customer website content and demo records:
 
    ```sh
    npm run seed
@@ -47,7 +47,13 @@ Autovia is a customer-facing car rental site with a React/Vite frontend and a se
 ## Backend MVC structure
 
 - `backend/src/config`: database connection
-- `backend/src/models`: Mongoose models (`Car`, `RentalRate`, `User`, `Festival`)
+- `backend/src/models`: Mongoose models for all 11 persisted collections (`users`, `cars`, `rentalrates`, `festivals`, `bookings`, `serviceblocks`, `cartypes`, `locations`, `addons`, `banners`, and `settings`):
+  - `User`: customer/admin accounts, hashed passwords, licence document metadata, and wishlist references
+  - `Car` and `RentalRate`: vehicle specifications, rates, deposits, and extra-kilometre packages
+  - `Festival`: per-date pricing multipliers
+  - `Booking`: customer reservation, driver, locations, price snapshot, and status
+  - `ServiceBlock`: maintenance-unavailable dates
+  - `CarType`, `Location`, `Addon`, `Banner`, and `Setting`: homepage categories, pickup/drop-off points, extras, promotions, and business pricing rules
 - `backend/src/controllers`: request handling and persistence operations
 - `backend/src/routes`: REST resource routes
 - `backend/src/middleware`: authentication, role checks, and error responses
@@ -65,6 +71,21 @@ Autovia is a customer-facing car rental site with a React/Vite frontend and a se
 Car creation, updates, and deletion require a bearer token for a user with the `admin` role. Public registration always creates a `customer`; clients cannot self-assign admin access. To provision a development admin, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `backend/.env` and run the seed command. No admin screens are included.
 
 Customer registration and login are available at `POST /api/v1/auth/register` and `POST /api/v1/auth/login`. Passwords are bcrypt-hashed and the API returns a signed bearer token.
+
+## Customer API
+
+- `GET /api/v1/site`: active banners, car types, locations, add-ons, and general pricing settings
+- `GET /api/v1/cars`: server-side search, filters, sorting, and pagination
+- `GET /api/v1/bookings/availability/:carId?from=YYYY-MM-DD&to=YYYY-MM-DD`: availability based on bookings and service blocks
+- `POST /api/v1/bookings/quote`: live server-side quote using rental rates, weekends, festivals, extra-kilometre packages, add-ons, and GST
+- `POST /api/v1/bookings`: authenticated reservation creation; the server recalculates the quote and rejects unavailable dates
+- `GET /api/v1/bookings/mine` and `GET /api/v1/bookings/mine/:bookingId`: authenticated booking history and detail
+- `GET/PATCH /api/v1/profile/me`: authenticated profile
+- `GET/POST /api/v1/profile/me/wishlist`: authenticated persisted wishlist
+
+Licence uploads accept JPEG, PNG, WebP, or PDF files up to 3 MB. The file is stored with the user record, while profile APIs return only its filename and type. Booking totals use Pay at Pickup, and the security deposit is saved separately from the trip total. Seed content can be adapted in `backend/src/scripts/seedDemoCars.js`; run `npm run seed` after configuring MongoDB to populate initial database records.
+
+The seed command inserts missing demo/site records without overwriting existing catalog or pricing data. It uses Mongoose's existing lowercase collection names (`rentalrates`, `serviceblocks`, and `cartypes`) so it will not create case-only duplicate collections. It also migrates embedded car service dates into `serviceblocks` without deleting the original legacy fields.
 
 ## Demo images
 

@@ -45,7 +45,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/booking/:carId" element={<BookingPage />} />
-            <Route path="/confirmation" element={<ConfirmationPage />} />
+            <Route path="/confirmation/:bookingId" element={<ConfirmationPage />} />
           </Routes>
         </main>
         <Footer />

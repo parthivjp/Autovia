@@ -3,7 +3,7 @@
   min-height: 560px;
   width: min(var(--container), calc(100% - 48px));
   margin: 14px auto 0;
-  background-image: linear-gradient(120deg, rgba(17, 24, 39, 0.68), rgba(17, 24, 39, 0.18)), url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1600&q=80');
+  background-image: linear-gradient(120deg, rgba(17, 24, 39, 0.68), rgba(17, 24, 39, 0.18)), url('/assets/cars/hyundai-creta.webp');
   background-size: cover;
   background-position: center;
   border-radius: 32px;

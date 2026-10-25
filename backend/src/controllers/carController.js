@@ -1,13 +1,14 @@
 import { Car } from '../models/Car.js'
+import { Booking } from '../models/Booking.js'
 import { RentalRate } from '../models/RentalRate.js'
 import { toCarResponse } from '../utils/carResponse.js'
 import { slugify } from '../utils/slugify.js'
 
 const carFields = [
-  'name', 'modelYear', 'type', 'fuel', 'seats', 'transmission', 'images',
-  'freeKm', 'status', 'featured', 'pickupLocations', 'serviceBlocks',
+  'name', 'description', 'modelYear', 'type', 'fuel', 'seats', 'transmission', 'images',
+  'freeKm', 'status', 'featured', 'pickupLocations',
 ]
-const rateFields = ['dailyRate', 'weekendRate', 'extraKmCharge', 'securityDeposit']
+const rateFields = ['dailyRate', 'weekendRate', 'extraKmCharge', 'securityDeposit', 'extraKmPackages']
 
 function pickFields(source, fields) {
   return Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]))
@@ -39,7 +40,9 @@ export async function listCars(req, res) {
   if (featured === 'true') filters.featured = true
   if (search?.trim()) {
     const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    filters.name = { $regex: escapedSearch, $options: 'i' }
+    filters.$or = ['name', 'type', 'fuel', 'transmission'].map((field) => ({
+      [field]: { $regex: escapedSearch, $options: 'i' },
+    }))
   }
 
   const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1)
@@ -112,8 +115,12 @@ export async function updateCar(req, res) {
 }
 
 export async function deleteCar(req, res) {
-  const car = await Car.findOneAndDelete({ slug: req.params.id })
+  const car = await Car.findOne({ slug: req.params.id })
   if (!car) return res.status(404).json({ error: 'Car not found.' })
+  if (await Booking.exists({ car: car._id })) {
+    return res.status(409).json({ error: 'Cars with booking history cannot be deleted.' })
+  }
+  await Car.deleteOne({ _id: car._id })
   await RentalRate.deleteOne({ car: car._id })
   return res.status(204).end()
 }

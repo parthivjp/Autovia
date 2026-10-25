@@ -1,10 +1,10 @@
 import { CarFront } from 'lucide-react'
-import { demoCars } from '../data/demoCars'
+import { useCars } from '../context/useCars'
 import './AuthLayout.css'
 
-const featuredCar = demoCars.find((car) => car.id === 'hyundai-creta') || demoCars[0]
-
 export default function AuthLayout({ eyebrow, title, description, footer, children, variant = 'login' }) {
+  const { cars } = useCars()
+  const featuredCar = cars.find((car) => car.featured) || cars[0]
   return (
     <section className={`auth-split auth-split--${variant}`}>
       <div className="auth-form-panel">
@@ -18,7 +18,7 @@ export default function AuthLayout({ eyebrow, title, description, footer, childr
       </div>
 
       <aside className="auth-visual" aria-label="Featured rental car">
-        <img className="auth-visual-image" src={featuredCar.image} alt={featuredCar.name} />
+        {featuredCar && <img className="auth-visual-image" src={featuredCar.image} alt={featuredCar.name} />}
         <div className="auth-visual-shade" />
         <div className="auth-visual-content">
           <div className="auth-visual-copy">

@@ -16,6 +16,7 @@ export function toCarResponse(carDocument) {
   return {
     id: car.slug,
     name: car.name,
+    ...(car.description ? { description: car.description } : {}),
     category: capitalize(car.type),
     type: car.type,
     fuel: capitalize(car.fuel),
@@ -26,6 +27,13 @@ export function toCarResponse(carDocument) {
     weekendRate: rate.weekendRate ?? 0,
     specialPrice: rate.weekendRate ?? rate.dailyRate ?? 0,
     extraKmCharge: rate.extraKmCharge ?? 0,
+    ...(rate.extraKmPackages?.length ? {
+      extraKmPackages: rate.extraKmPackages.map((item) => ({
+        label: item.label,
+        km: item.km,
+        price: item.price,
+      })),
+    } : {}),
     securityDeposit: rate.securityDeposit ?? 0,
     freeKm: car.freeKm,
     images: car.images || [],
@@ -33,7 +41,5 @@ export function toCarResponse(carDocument) {
     status: capitalize((car.status || 'available').replace('-', ' ')),
     featured: Boolean(car.featured),
     pickupLocations: car.pickupLocations || [],
-    serviceBlocks: car.serviceBlocks || [],
-    availableDates: [],
   }
 }

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Gauge, MapPin, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Gauge, MapPin, Users } from 'lucide-react'
 import { useCars } from '../context/useCars'
+import { apiRequest } from '../services/api'
 import './CarDetailsPage.css'
 
 export default function CarDetailsPage() {
@@ -9,16 +10,28 @@ export default function CarDetailsPage() {
   const navigate = useNavigate()
   const { cars, loading, error } = useCars()
   const car = cars.find((item) => item.id === carId)
-  const [calendarDates] = useState(() => Array.from({ length: 14 }, (_, index) => {
-    const date = new Date()
-    date.setDate(date.getDate() + index)
-    return date
-  }))
-  const calendarDays = !car ? [] : calendarDates.map((date) => {
-    const key = date.toISOString().slice(0, 10)
-    const status = car.serviceBlocks.includes(key) ? 'Under Service' : car.status
-    return { date, status }
-  })
+  const [imageSelection, setImageSelection] = useState({ carId: '', source: '' })
+  const [availability, setAvailability] = useState([])
+  const [availabilityError, setAvailabilityError] = useState('')
+
+  useEffect(() => {
+    if (!carId) return undefined
+    const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const from = new Date()
+    const to = new Date()
+    to.setDate(to.getDate() + 13)
+    let active = true
+    apiRequest(`/api/v1/bookings/availability/${carId}?from=${dateKey(from)}&to=${dateKey(to)}`)
+      .then(({ availability: dates }) => {
+        if (active) setAvailability(dates)
+      })
+      .catch((requestError) => {
+        if (active) setAvailabilityError(requestError.message)
+      })
+    return () => { active = false }
+  }, [carId])
+
+  const selectedImage = imageSelection.carId === carId ? imageSelection.source : car?.image
 
   if (loading) return <div className="page-shell"><div className="empty-state">Loading car details…</div></div>
   if (error) return <div className="page-shell"><div className="empty-state" role="alert">Unable to load car details: {error}</div></div>
@@ -41,7 +54,16 @@ export default function CarDetailsPage() {
 
       <div className="detail-layout">
         <div className="detail-media">
-          <img src={car.image} alt={car.name} />
+          <img src={selectedImage || car.image} alt={car.name} />
+          {car.images.length > 1 && (
+            <div className="detail-image-thumbnails">
+              {car.images.map((image) => (
+                <button type="button" key={image} onClick={() => setImageSelection({ carId, source: image })} aria-label={`View ${car.name} image`}>
+                  <img src={image} alt="" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="detail-summary">
@@ -60,15 +82,7 @@ export default function CarDetailsPage() {
             <div><MapPin size={18} /> <span>{car.freeKm} free km/day</span></div>
           </div>
 
-          <p className="detail-description">
-            Enjoy a premium {car.category.toLowerCase()} experience with smooth performance, generous luggage space, and a comfortable interior built for long drives and city mobility.
-          </p>
-
-          <ul className="feature-list">
-            <li><ShieldCheck size={16} /> Free cancellation up to 24 hours before pickup</li>
-            <li><ShieldCheck size={16} /> Roadside assistance and 24/7 support</li>
-            <li><ShieldCheck size={16} /> Unlimited local support with document assistance</li>
-          </ul>
+          {car.description && <p className="detail-description">{car.description}</p>}
 
           <div className="pickup-locations">
             <h2>Pickup locations</h2>
@@ -97,13 +111,17 @@ export default function CarDetailsPage() {
           </div>
         </div>
         <div className="availability-days">
-          {calendarDays.map(({ date, status }) => (
-            <div className={`availability-day ${status.toLowerCase().replaceAll(' ', '-')}`} key={date.toISOString()}>
-              <strong>{date.toLocaleDateString('en-IN', { weekday: 'short' })}</strong>
-              <span>{date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-              <small>{status}</small>
-            </div>
-          ))}
+          {availability.map(({ date, status }) => {
+            const day = new Date(`${date}T00:00:00`)
+            return (
+              <div className={`availability-day ${status.toLowerCase().replaceAll(' ', '-')}`} key={date}>
+                <strong>{day.toLocaleDateString('en-IN', { weekday: 'short' })}</strong>
+                <span>{day.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                <small>{status}</small>
+              </div>
+            )
+          })}
+          {availabilityError && <div className="empty-state" role="alert">Unable to load availability: {availabilityError}</div>}
         </div>
       </section>
     </div>

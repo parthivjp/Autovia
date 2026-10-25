@@ -1,19 +1,37 @@
-import { Link } from 'react-router-dom'
-import { Heart, Star } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Heart } from 'lucide-react'
 import { useWishlist } from '../context/WishlistContext'
+import { useAuth } from '../context/AuthContext'
 import './CarCard.css'
 
 export default function CarCard({ car }) {
   const { wishlist, toggleWishlist } = useWishlist()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [error, setError] = useState('')
   const isSaved = wishlist.includes(car.id)
+  const handleWishlist = async () => {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    try {
+      await toggleWishlist(car.id)
+      setError('')
+    } catch (requestError) {
+      setError(requestError.message)
+    }
+  }
 
   return (
     <article className="car-card">
       <div className="car-image-wrap">
         <img src={car.image} alt={car.name} loading="lazy" />
-        <button type="button" className={`wishlist-toggle ${isSaved ? 'active' : ''}`} onClick={() => toggleWishlist(car.id)} aria-label={`Toggle wishlist for ${car.name}`}>
+        <button type="button" className={`wishlist-toggle ${isSaved ? 'active' : ''}`} onClick={handleWishlist} aria-label={`Toggle wishlist for ${car.name}`}>
           <Heart size={18} fill={isSaved ? 'currentColor' : 'none'} />
         </button>
+        {error && <span className="form-error" role="alert">{error}</span>}
       </div>
 
       <div className="car-body">
@@ -22,7 +40,6 @@ export default function CarCard({ car }) {
             <p className="car-category">{car.category}</p>
             <h3>{car.name}</h3>
           </div>
-          <span className="rating-badge"><Star size={12} /> 4.8</span>
         </div>
 
         <p className="car-meta">{car.fuel} • {car.transmission} • {car.seats} seats</p>

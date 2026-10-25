@@ -21,14 +21,24 @@ export function AuthProvider({ children }) {
     return true
   }
 
-  const register = async ({ name, email, password, phone, drivingLicense }) => {
+  const register = async ({ name, email, password, phone, drivingLicense, drivingLicenseDocument }) => {
     const result = await apiRequest('/api/v1/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ name, email, password, phone, drivingLicense }),
+      body: JSON.stringify({ name, email, password, phone, drivingLicense, drivingLicenseDocument }),
     })
     setUser(result.user)
     localStorage.setItem('autovia-user', JSON.stringify(result.user))
     localStorage.setItem('autovia-token', result.token)
+    return result.user
+  }
+
+  const saveProfile = async (profile) => {
+    const result = await apiRequest('/api/v1/profile/me', {
+      method: 'PATCH',
+      body: JSON.stringify(profile),
+    })
+    setUser(result.user)
+    localStorage.setItem('autovia-user', JSON.stringify(result.user))
     return result.user
   }
 
@@ -38,7 +48,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('autovia-token')
   }
 
-  const value = useMemo(() => ({ user, login, register, logout }), [user])
+  const value = useMemo(() => ({ user, login, register, saveProfile, logout }), [user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

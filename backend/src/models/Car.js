@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 const carSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
   name: { type: String, required: true, trim: true, maxlength: 120 },
+  description: { type: String, default: '', maxlength: 2000 },
   modelYear: { type: Number, required: true, min: 1900, max: 2100 },
   type: { type: String, required: true, enum: ['hatchback', 'sedan', 'suv', 'muv'] },
   fuel: { type: String, required: true, enum: ['petrol', 'diesel', 'cng', 'electric'] },
@@ -13,7 +14,6 @@ const carSchema = new mongoose.Schema({
   status: { type: String, enum: ['available', 'booked', 'under-service'], default: 'available' },
   featured: { type: Boolean, default: false },
   pickupLocations: { type: [String], default: [] },
-  serviceBlocks: { type: [String], default: [] },
 }, { timestamps: true })
 
 carSchema.virtual('rentalRate', {

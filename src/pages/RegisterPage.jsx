@@ -7,7 +7,7 @@ export default function RegisterPage() {
   const navigate = useNavigate()
   const { register, user } = useAuth()
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', drivingLicense: '' })
-  const [licenseFileName, setLicenseFileName] = useState('')
+  const [licenseFile, setLicenseFile] = useState(null)
   const [error, setError] = useState('')
 
   if (user) {
@@ -17,14 +17,31 @@ export default function RegisterPage() {
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    if (!form.name || !form.email || !form.phone || !form.password || !form.drivingLicense || !licenseFileName) {
+    if (!form.name || !form.email || !form.phone || !form.password || !form.drivingLicense || !licenseFile) {
       setError('Please complete all fields and select a driving licence image.')
       return
     }
 
     setError('')
     try {
-      await register(form)
+      if (licenseFile.size > 3 * 1024 * 1024) {
+        setError('Driving licence file must be smaller than 3 MB.')
+        return
+      }
+      const data = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('Unable to read the licence file.'))
+        reader.readAsDataURL(licenseFile)
+      })
+      await register({
+        ...form,
+        drivingLicenseDocument: {
+          filename: licenseFile.name,
+          mimeType: licenseFile.type,
+          data,
+        },
+      })
       navigate('/profile')
     } catch (requestError) {
       setError(requestError.message)
@@ -82,10 +99,10 @@ export default function RegisterPage() {
           <input
             type="file"
             accept="image/*,.pdf"
-            onChange={(event) => setLicenseFileName(event.target.files?.[0]?.name || '')}
+            onChange={(event) => setLicenseFile(event.target.files?.[0] || null)}
             required
           />
-          {licenseFileName && <span>{licenseFileName}</span>}
+          {licenseFile && <span>{licenseFile.name}</span>}
         </label>
         <input
           type="password"
@@ -99,7 +116,7 @@ export default function RegisterPage() {
         />
         {error && <p className="form-error" role="alert">{error}</p>}
         <button type="submit" className="btn btn-primary">Create account</button>
-        <p className="auth-register-note">Licence files are not uploaded in this demo.</p>
+        <p className="auth-register-note">Your licence document is stored with your customer profile.</p>
       </form>
     </AuthLayout>
   )

@@ -11,12 +11,21 @@ function createToken(user) {
 }
 
 export async function register(req, res) {
-  const { name, email, password, phone = '', drivingLicense = '' } = req.body
-  if (!name?.trim() || !email?.trim() || !password) {
+  const { name, email, password, phone = '', drivingLicense = '', drivingLicenseDocument } = req.body || {}
+  if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Name, email, and password are required.' })
   }
   if (password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters.' })
+  }
+  if (drivingLicenseDocument) {
+    const { mimeType, data } = drivingLicenseDocument
+    if (!['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(mimeType)
+      || !/^data:(image\/(jpeg|png|webp)|application\/pdf);base64,/.test(data || '')
+      || typeof data !== 'string'
+      || data.length > 4_300_000) {
+      return res.status(400).json({ error: 'Licence document must be a JPEG, PNG, WebP, or PDF file under 3 MB.' })
+    }
   }
 
   const existing = await User.exists({ email: email.trim().toLowerCase() })
@@ -30,14 +39,19 @@ export async function register(req, res) {
     passwordHash: await bcrypt.hash(password, 12),
     phone,
     drivingLicense,
+    drivingLicenseDocument: drivingLicenseDocument ? {
+      filename: String(drivingLicenseDocument.filename || 'driving-license').replace(/[\r\n]/g, '').slice(0, 255),
+      mimeType: drivingLicenseDocument.mimeType,
+      data: drivingLicenseDocument.data,
+    } : undefined,
     role: 'customer',
   })
   res.status(201).json({ user: user.toJSON(), token: createToken(user) })
 }
 
 export async function login(req, res) {
-  const { email, password } = req.body
-  if (!email || !password) {
+  const { email, password } = req.body || {}
+  if (typeof email !== 'string' || !email || typeof password !== 'string' || !password) {
     return res.status(400).json({ error: 'Email and password are required.' })
   }
 

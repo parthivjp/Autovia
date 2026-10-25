@@ -16,7 +16,6 @@ test('maps a MongoDB car and rental rate to the customer API shape', () => {
     status: 'under-service',
     featured: true,
     pickupLocations: ['Bengaluru Airport'],
-    serviceBlocks: ['2026-11-14'],
     rentalRate: { dailyRate: 3200, weekendRate: 4200, extraKmCharge: 25, securityDeposit: 7000 },
   })
 
@@ -40,8 +39,6 @@ test('maps a MongoDB car and rental rate to the customer API shape', () => {
     status: 'Under service',
     featured: true,
     pickupLocations: ['Bengaluru Airport'],
-    serviceBlocks: ['2026-11-14'],
-    availableDates: [],
   })
 })
 

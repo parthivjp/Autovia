@@ -1,13 +1,25 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import { useWishlist } from '../context/WishlistContext'
 import { useCars } from '../context/useCars'
+import { useAuth } from '../context/AuthContext'
 import './WishlistPage.css'
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist } = useWishlist()
   const { cars, loading, error } = useCars()
+  const { user } = useAuth()
+  const [wishlistError, setWishlistError] = useState('')
   const savedCars = cars.filter((car) => wishlist.includes(car.id))
+  const removeCar = async (carId) => {
+    try {
+      await toggleWishlist(carId)
+      setWishlistError('')
+    } catch (requestError) {
+      setWishlistError(requestError.message)
+    }
+  }
 
   return (
     <div className="page-shell">
@@ -23,6 +35,12 @@ export default function WishlistPage() {
         <div className="empty-state">Loading saved cars…</div>
       ) : error ? (
         <div className="empty-state" role="alert">Unable to load saved cars: {error}</div>
+      ) : !user ? (
+        <div className="empty-state">
+          <Heart size={20} />
+          <p>Log in to save cars to your account wishlist.</p>
+          <Link to="/login" className="btn btn-primary">Login</Link>
+        </div>
       ) : savedCars.length === 0 ? (
         <div className="empty-state">
           <Heart size={20} />
@@ -31,6 +49,7 @@ export default function WishlistPage() {
         </div>
       ) : (
         <div className="cars-grid">
+          {wishlistError && <div className="empty-state" role="alert">{wishlistError}</div>}
           {savedCars.map((car) => (
             <article key={car.id} className="car-card">
               <img src={car.image} alt={car.name} className="wishlist-image" />
@@ -47,7 +66,7 @@ export default function WishlistPage() {
                   <span>/ day</span>
                 </div>
                 <div className="car-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => toggleWishlist(car.id)}>Remove</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => removeCar(car.id)}>Remove</button>
                   <Link to={`/booking/${car.id}`} className="btn btn-primary">Book</Link>
                 </div>
               </div>

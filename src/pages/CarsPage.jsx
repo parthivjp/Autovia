@@ -1,14 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import CarCard from '../components/CarCard'
-import { useCars } from '../context/useCars'
+import { apiRequest } from '../services/api'
 import './CarsPage.css'
 
-const PAGE_SIZE = 4
-const vehicleTypes = ['all', 'hatchback', 'sedan', 'suv', 'muv']
-
+const PAGE_SIZE = 8
 export default function CarsPage() {
-  const { cars, loading, error } = useCars()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [fuel, setFuel] = useState('all')
@@ -17,17 +14,69 @@ export default function CarsPage() {
   const [maxPrice, setMaxPrice] = useState('')
   const [sort, setSort] = useState('recommended')
   const [page, setPage] = useState(1)
+  const [cars, setCars] = useState([])
+  const [carTypes, setCarTypes] = useState([])
+  const [pagination, setPagination] = useState({ total: 0, pages: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const category = (searchParams.get('category') || 'all').toLowerCase()
+  const vehicleTypes = ['all', ...carTypes.map((carType) => carType.slug)]
   const type = vehicleTypes.includes(category) ? category : 'all'
+
+  useEffect(() => {
+    let active = true
+    apiRequest('/api/v1/site')
+      .then(({ carTypes: types }) => {
+        if (active) setCarTypes(types)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      sort,
+    })
+    if (search.trim()) query.set('search', search.trim())
+    if (type !== 'all') query.set('type', type)
+    if (fuel !== 'all') query.set('fuel', fuel)
+    if (transmission !== 'all') query.set('transmission', transmission)
+    if (seats !== 'all') query.set('seats', seats)
+    if (maxPrice) query.set('maxPrice', maxPrice)
+
+    apiRequest(`/api/v1/cars?${query}`)
+      .then((result) => {
+        if (!active) return
+        setCars(result.cars)
+        setPagination(result.pagination)
+        setError('')
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [page, search, type, fuel, transmission, seats, maxPrice, sort])
 
   const updateFilter = (setter) => (event) => {
     setter(event.target.value)
     setPage(1)
+    setLoading(true)
+    setError('')
   }
 
   const handleTypeChange = (event) => {
     const nextType = event.target.value
     setPage(1)
+    setLoading(true)
+    setError('')
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
       if (nextType === 'all') next.delete('category')
@@ -36,27 +85,6 @@ export default function CarsPage() {
     })
   }
 
-  const visibleCars = useMemo(() => {
-    const filtered = cars.filter((car) => {
-      const matchesSearch = !search || `${car.name} ${car.category} ${car.fuel} ${car.transmission}`.toLowerCase().includes(search.trim().toLowerCase())
-      const matchesType = type === 'all' || car.type.toLowerCase() === type
-      const matchesFuel = fuel === 'all' || car.fuel.toLowerCase() === fuel
-      const matchesTransmission = transmission === 'all' || car.transmission.toLowerCase() === transmission
-      const matchesSeats = seats === 'all' || car.seats >= Number(seats)
-      const matchesPrice = !maxPrice || car.pricePerDay <= Number(maxPrice)
-      return matchesSearch && matchesType && matchesFuel && matchesTransmission && matchesSeats && matchesPrice
-    })
-
-    if (sort === 'price-asc') return filtered.sort((a, b) => a.pricePerDay - b.pricePerDay)
-    if (sort === 'price-desc') return filtered.sort((a, b) => b.pricePerDay - a.pricePerDay)
-    if (sort === 'name') return filtered.sort((a, b) => a.name.localeCompare(b.name))
-    return filtered
-  }, [cars, search, type, fuel, transmission, seats, maxPrice, sort])
-
-  const pageCount = Math.ceil(visibleCars.length / PAGE_SIZE)
-  const currentPage = Math.min(page, Math.max(pageCount, 1))
-  const pageCars = visibleCars.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-
   return (
     <div className="page-shell">
       <div className="page-heading-row">
@@ -64,7 +92,7 @@ export default function CarsPage() {
           <span className="eyebrow">Fleet</span>
           <h1 className="page-title">{type === 'all' ? 'Find your perfect drive' : `${type[0].toUpperCase()}${type.slice(1)} cars`}</h1>
         </div>
-        <div className="results-pill">{visibleCars.length} vehicles</div>
+        <div className="results-pill">{pagination.total} vehicles</div>
       </div>
 
       <div className="filters-panel">
@@ -97,16 +125,14 @@ export default function CarsPage() {
           <option value="5">5+ seats</option>
           <option value="7">7+ seats</option>
         </select>
-        <label className="price-filter">
-          <input
-            type="number"
-            min="0"
-            value={maxPrice}
-            onChange={updateFilter(setMaxPrice)}
-            placeholder="Max price / day"
-            aria-label="Maximum daily price"
-          />
-        </label>
+        <input
+          type="number"
+          min="0"
+          value={maxPrice}
+          onChange={updateFilter(setMaxPrice)}
+          placeholder="Max price / day"
+          aria-label="Maximum daily price"
+        />
         <select value={sort} onChange={updateFilter(setSort)} aria-label="Sort cars">
           <option value="recommended">Recommended</option>
           <option value="price-asc">Price: low to high</option>
@@ -120,17 +146,17 @@ export default function CarsPage() {
           <div className="empty-state">Loading cars…</div>
         ) : error ? (
           <div className="empty-state" role="alert">Unable to load cars: {error}</div>
-        ) : pageCars.length > 0 ? (
-          pageCars.map((car) => <CarCard key={car.id} car={car} />)
+        ) : cars.length > 0 ? (
+          cars.map((car) => <CarCard key={car.id} car={car} />)
         ) : (
           <div className="empty-state">No cars match your filters. Try a wider search.</div>
         )}
       </div>
-      {pageCount > 1 && (
+      {pagination.pages > 1 && (
         <nav className="pagination" aria-label="Car listing pages">
-          <button type="button" onClick={() => setPage(currentPage - 1)} disabled={currentPage === 1}>Previous</button>
-          <span>Page {currentPage} of {pageCount}</span>
-          <button type="button" onClick={() => setPage((current) => current + 1)} disabled={currentPage === pageCount}>Next</button>
+          <button type="button" onClick={() => { setLoading(true); setPage((current) => current - 1) }} disabled={page === 1}>Previous</button>
+          <span>Page {page} of {pagination.pages}</span>
+          <button type="button" onClick={() => { setLoading(true); setPage((current) => current + 1) }} disabled={page === pagination.pages}>Next</button>
         </nav>
       )}
     </div>
