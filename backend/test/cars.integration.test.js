@@ -652,12 +652,32 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   const settingsResponse = await fetch(`${baseUrl}/api/v1/admin/settings`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', ...adminHeaders },
-    body: JSON.stringify({ gstRate: 0.2, businessName: 'Autovia Test', contactPhone: '1234567890' }),
+    body: JSON.stringify({
+      gstRate: 0.2,
+      businessName: 'Autovia Test',
+      contactEmail: 'contact@autovia.test',
+      contactPhone: '1234567890',
+      businessAddress: '123 Test Street',
+      lateFeePerHour: 1000,
+      cancellationHours: 48,
+    }),
   })
   assert.equal(settingsResponse.status, 200)
-  assert.equal((await settingsResponse.json()).settings.gstRate, 0.2)
+  const savedSettings = (await settingsResponse.json()).settings
+  assert.equal(savedSettings.gstRate, 0.2)
+  assert.equal(savedSettings.businessName, 'Autovia Test')
+  assert.equal(savedSettings.contactEmail, 'contact@autovia.test')
+  assert.equal(savedSettings.contactPhone, '1234567890')
+  assert.equal(savedSettings.businessAddress, '123 Test Street')
+  assert.equal(savedSettings.lateFeePerHour, 1000)
+  assert.equal(savedSettings.cancellationHours, 48)
   const siteWithSettings = await fetch(`${baseUrl}/api/v1/site`).then((response) => response.json())
   assert.equal(siteWithSettings.settings.businessName, 'Autovia Test')
+  assert.equal(siteWithSettings.settings.contactEmail, 'contact@autovia.test')
+  assert.equal(siteWithSettings.settings.contactPhone, '1234567890')
+  assert.equal(siteWithSettings.settings.businessAddress, '123 Test Street')
+  assert.equal(siteWithSettings.settings.lateFeePerHour, 1000)
+  assert.equal(siteWithSettings.settings.cancellationHours, 48)
   const invalidGstResponse = await fetch(`${baseUrl}/api/v1/admin/settings`, {
     method: 'PUT',
     headers: { 'content-type': 'application/json', ...adminHeaders },
@@ -849,13 +869,13 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
     body: JSON.stringify({ status: 'returned', actualKmDriven: 1000, lateHours: 2 }),
   })
   assert.equal(returnResponse.status, 200)
-  assert.equal((await returnResponse.json()).booking.total, 9639)
+  assert.equal((await returnResponse.json()).booking.total, 10639)
 
   const returnedBooking = await Booking.findOne({ bookingId: adminBookingId }).lean()
   assert.equal(returnedBooking.status, 'returned')
   assert.equal(returnedBooking.licenseVerified, true)
   assert.equal(returnedBooking.extraKmDrivenCharge, 1500)
-  assert.equal(returnedBooking.lateFee, 1000)
+  assert.equal(returnedBooking.lateFee, 2000)
   const myReturnedBooking = await fetch(`${baseUrl}/api/v1/bookings/mine`, {
     headers: { authorization: ['Bearer', customerToken].join(' ') },
   }).then((response) => response.json())
