@@ -1,5 +1,11 @@
 import mongoose from 'mongoose'
 
+const cancellationSchema = new mongoose.Schema({
+  reason: { type: String, trim: true, maxlength: 500, default: '' },
+  cancelledAt: { type: Date, required: true },
+  cancelledBy: { type: String, enum: ['customer', 'admin'], required: true },
+}, { _id: false })
+
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, required: true, unique: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -38,6 +44,7 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: { type: String, enum: ['pay-at-pickup'], default: 'pay-at-pickup' },
   status: { type: String, enum: ['pending', 'confirmed', 'picked-up', 'returned', 'cancelled', 'completed'], default: 'pending' },
+  cancellation: { type: cancellationSchema, default: undefined },
   cancellationReason: { type: String, trim: true, maxlength: 500, default: '' },
   cancelledAt: { type: Date },
   cancelledBy: { type: String, enum: ['customer', 'admin'] },

@@ -6,6 +6,7 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "seed": "node src/scripts/seedDemoCars.js",
+    "migrate:cancellations": "node src/scripts/migrateBookingCancellations.js",
     "test": "node --test"
   },
   "dependencies": {

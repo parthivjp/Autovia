@@ -210,6 +210,11 @@ export async function createBooking(req, res) {
 
 function serializeBooking(booking) {
   if (!booking) return null
+  const cancellationRecord = booking.cancellation || {
+    reason: booking.cancellationReason || '',
+    cancelledAt: booking.cancelledAt || null,
+    cancelledBy: booking.cancelledBy || '',
+  }
   return {
     id: booking.bookingId,
     car: toCarResponse(booking.car),
@@ -232,9 +237,9 @@ function serializeBooking(booking) {
     },
     paymentMethod: 'Pay at Pickup',
     status: booking.status,
-    cancellation: booking.cancellation,
-    cancellationReason: booking.cancellationReason || '',
-    cancelledAt: booking.cancelledAt || null,
+    cancellation: { ...cancellationRecord, ...(booking.cancellationEligibility || {}) },
+    cancellationReason: cancellationRecord.reason || '',
+    cancelledAt: cancellationRecord.cancelledAt || null,
     createdAt: booking.createdAt,
   }
 }
@@ -247,7 +252,7 @@ export async function listMyBookings(req, res) {
   const cancellationHours = settings?.cancellationHours ?? 24
   res.json({ bookings: bookings.map((booking) => serializeBooking({
     ...booking,
-    cancellation: cancellationInfo(booking, cancellationHours),
+    cancellationEligibility: cancellationInfo(booking, cancellationHours),
   })) })
 }
 
@@ -257,7 +262,7 @@ export async function getMyBooking(req, res) {
   const settings = await Setting.findOne({ key: 'general' }).select('cancellationHours').lean()
   return res.json({ booking: serializeBooking({
     ...booking,
-    cancellation: cancellationInfo(booking, settings?.cancellationHours ?? 24),
+    cancellationEligibility: cancellationInfo(booking, settings?.cancellationHours ?? 24),
   }) })
 }
 
@@ -290,9 +295,11 @@ export async function cancelMyBooking(req, res) {
     {
       $set: {
         status: 'cancelled',
-        cancellationReason: reason.trim(),
-        cancelledAt,
-        cancelledBy: 'customer',
+        cancellation: {
+          reason: reason.trim(),
+          cancelledAt,
+          cancelledBy: 'customer',
+        },
       },
     },
     { new: true },
@@ -307,7 +314,7 @@ export async function cancelMyBooking(req, res) {
     message: 'Booking cancelled successfully.',
     booking: serializeBooking({
       ...updatedBooking,
-      cancellation: { ...info, canCancel: false },
+      cancellationEligibility: { ...info, canCancel: false },
     }),
   })
 }

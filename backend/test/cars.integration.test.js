@@ -875,9 +875,9 @@ test('admin APIs protect the workspace and manage fleet operations, pricing, boo
   assert.equal(cancellation.booking.cancellationReason, 'Plans changed')
   assert.equal(cancellation.booking.cancellation.canCancel, false)
   const savedCancellation = await Booking.findOne({ bookingId: cancellableBooking.id }).lean()
-  assert.equal(savedCancellation.cancellationReason, 'Plans changed')
-  assert.equal(savedCancellation.cancelledBy, 'customer')
-  assert.ok(savedCancellation.cancelledAt instanceof Date)
+  assert.equal(savedCancellation.cancellation.reason, 'Plans changed')
+  assert.equal(savedCancellation.cancellation.cancelledBy, 'customer')
+  assert.ok(savedCancellation.cancellation.cancelledAt instanceof Date)
 
   const duplicateCancellationResponse = await fetch(`${baseUrl}/api/v1/bookings/mine/${cancellableBooking.id}/cancel`, {
     method: 'POST',
