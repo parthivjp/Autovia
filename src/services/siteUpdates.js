@@ -1,10 +1,11 @@
 let eventSource
 const subscribers = new Set()
+const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 function connect() {
   if (eventSource || !subscribers.size || typeof EventSource === 'undefined') return
 
-  eventSource = new EventSource('/api/v1/site/events')
+  eventSource = new EventSource(`${apiBaseUrl}/api/v1/site/events`)
   eventSource.addEventListener('site-updated', () => {
     for (const subscriber of subscribers) subscriber()
   })

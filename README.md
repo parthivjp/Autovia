@@ -357,6 +357,90 @@ Run the repository linter:
 npm run lint
 ```
 
+## Render and MongoDB Atlas deployment
+
+The repository includes [render.yaml](./render.yaml), which defines:
+
+- `autovia-api`: a Node web service running the Express backend;
+- `autovia-web`: a Render Static Site serving the Vite build; and
+- a linked frontend-to-backend API URL and backend CORS origin.
+
+The Blueprint does not create the MongoDB Atlas project or cluster. Atlas is
+kept separate from Render so the database lifecycle and network access can be
+managed independently.
+
+### 1. Create the MongoDB Atlas database
+
+1. Create a MongoDB Atlas project and a free or paid cluster.
+2. Create a database user with a strong password.
+3. Add the Render outbound IP policy required by your Atlas plan. For an
+   initial Render deployment, Atlas commonly uses `0.0.0.0/0`; restrict this
+   later with a managed network policy or private networking where available.
+4. Copy the Atlas driver connection string and replace its username,
+   password, and database name with `autovia`.
+
+The value should resemble:
+
+```text
+mongodb+srv://<username>:<password>@<cluster-host>/autovia?retryWrites=true&w=majority
+```
+
+Keep the connection string private. It must only be entered as the Render
+`MONGODB_URI` environment variable and must never be committed.
+
+### 2. Create the Render services
+
+1. Push the repository to GitHub.
+2. In Render, choose **New → Blueprint** and select this repository.
+3. Render reads `render.yaml` and proposes both services.
+4. Enter the secret values requested for:
+   - `MONGODB_URI`: the Atlas connection string;
+   - `ADMIN_EMAIL`: the administrator email to provision; and
+   - `ADMIN_PASSWORD`: a strong administrator password.
+5. Deploy the Blueprint and wait for `autovia-api` to pass
+   `/api/v1/health`.
+6. Open the frontend service URL and use `/admin/login` for the administrator
+   workspace.
+
+The Blueprint generates `JWT_SECRET` on Render. Do not replace it with a
+value committed to source control. The frontend receives the backend URL at
+build time through `VITE_API_URL`, while the backend receives the frontend
+host through `CLIENT_ORIGIN`.
+
+### 3. Seed Atlas data
+
+After the backend service is deployed, run the seed command from a local
+checkout using the Atlas URI:
+
+```powershell
+$env:MONGODB_URI = "mongodb+srv://<username>:<password>@<cluster-host>/autovia?retryWrites=true&w=majority"
+$env:ADMIN_EMAIL = "admin@example.com"
+$env:ADMIN_PASSWORD = "use-a-strong-password"
+npm run seed
+```
+
+Alternatively, run the same command through a Render Shell for the
+`autovia-api` service if the plan provides shell access. The seed is
+idempotent and inserts missing demo and site records without intentionally
+overwriting existing catalogue or pricing data.
+
+### 4. Verify the deployment
+
+Check the following after deployment:
+
+```text
+https://<autovia-api>.onrender.com/api/v1/health
+https://<autovia-web>.onrender.com/
+https://<autovia-web>.onrender.com/admin/login
+```
+
+Create a customer account, browse the fleet, request a quote, and place a
+test Pay-at-Pickup booking. Then update a banner, rate, location, or service
+block in the admin panel and confirm that the customer site reflects it.
+
+Render free web services may sleep after inactivity. The first request after a
+sleep can take longer while the service starts.
+
 The cancellation migration is available for databases containing records
 created before structured cancellation data was introduced:
 
