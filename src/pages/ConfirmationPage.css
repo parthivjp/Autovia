@@ -13,6 +13,26 @@
   padding: 28px;
 }
 
+.unavailable-state {
+  display: grid;
+  gap: 14px;
+}
+
+.unavailable-state h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+}
+
+.unavailable-state p {
+  line-height: 1.6;
+}
+
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
 .success-state h1 {
   margin-top: 8px;
   margin-bottom: 12px;

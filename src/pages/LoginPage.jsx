@@ -1,16 +1,23 @@
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import AuthLayout from '../components/AuthLayout'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login, user } = useAuth()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const requestedPath = location.state?.from
+  const returnTo = typeof requestedPath === 'string'
+    && requestedPath.startsWith('/')
+    && !requestedPath.startsWith('//')
+    ? requestedPath
+    : '/profile'
 
   if (user) {
-    return <Navigate to="/profile" replace />
+    return <Navigate to={returnTo} replace />
   }
 
   const handleSubmit = async (event) => {
@@ -18,7 +25,7 @@ export default function LoginPage() {
     setError('')
     try {
       await login(form)
-      navigate('/profile')
+      navigate(returnTo, { replace: true })
     } catch (requestError) {
       setError(requestError.message)
     }

@@ -1,30 +1,38 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { apiRequest } from '../services/api'
 import './ConfirmationPage.css'
 
 export default function ConfirmationPage() {
+  const { user } = useAuth()
   const { bookingId } = useParams()
   const location = useLocation()
-  const [booking, setBooking] = useState(location.state?.booking || null)
-  const [loading, setLoading] = useState(!location.state?.booking)
-  const [error, setError] = useState('')
+  const [requestResult, setRequestResult] = useState(null)
+  const [retry, setRetry] = useState(0)
+  const requestKey = `${bookingId}:${retry}`
+  const currentResult = requestResult?.key === requestKey ? requestResult : null
 
   useEffect(() => {
-    if (!bookingId || booking) return undefined
+    if (!user || !bookingId) return undefined
     let active = true
     apiRequest(`/api/v1/bookings/mine/${bookingId}`)
       .then(({ booking: savedBooking }) => {
-        if (active) setBooking(savedBooking)
+        if (active) setRequestResult({ key: requestKey, booking: savedBooking, hasError: false })
       })
-      .catch((requestError) => {
-        if (active) setError(requestError.message)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
+      .catch(() => {
+        if (active) setRequestResult({ key: requestKey, booking: null, hasError: true })
       })
     return () => { active = false }
-  }, [bookingId, booking])
+  }, [bookingId, requestKey, retry, user])
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  }
+
+  const loading = !currentResult
+  const booking = currentResult?.booking
+  const hasError = currentResult?.hasError
 
   if (loading) {
     return <div className="page-shell confirmation-page"><div className="confirmation-card">Loading your booking…</div></div>
@@ -33,11 +41,17 @@ export default function ConfirmationPage() {
   if (!booking) {
     return (
       <div className="page-shell confirmation-page">
-        <div className="confirmation-card">
+        <div className="confirmation-card unavailable-state">
           <span className="eyebrow">Booking unavailable</span>
-          <h1>We could not load this reservation</h1>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          <Link to="/profile" className="btn btn-primary">View bookings</Link>
+          <h1>{hasError ? 'We could not load this reservation' : 'Reservation not found'}</h1>
+          <p role={hasError ? 'alert' : undefined}>
+            This reservation is unavailable for this account. Sign in with the account used to make the booking, or check your bookings.
+          </p>
+          <div className="confirmation-actions">
+            <Link to="/profile" className="btn btn-primary">View bookings</Link>
+            {hasError && <button type="button" className="btn btn-secondary" onClick={() => setRetry((current) => current + 1)}>Try again</button>}
+            <Link to="/cars" className="btn btn-secondary">Browse cars</Link>
+          </div>
         </div>
       </div>
     )

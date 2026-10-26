@@ -548,6 +548,17 @@ test('customer site content, server quotes, bookings, availability, and wishlist
     headers: { authorization: `Bearer ${customerToken}` },
   })
   assert.equal((await myBookingsResponse.json()).bookings[0].id, booking.id)
+  const unauthenticatedBookingDetail = await fetch(`${baseUrl}/api/v1/bookings/mine/${booking.id}`)
+  assert.equal(unauthenticatedBookingDetail.status, 401)
+  const otherUserBookingDetail = await fetch(`${baseUrl}/api/v1/bookings/mine/${booking.id}`, {
+    headers: { authorization: ['Bearer', adminToken].join(' ') },
+  })
+  assert.equal(otherUserBookingDetail.status, 404)
+  const ownerBookingDetail = await fetch(`${baseUrl}/api/v1/bookings/mine/${booking.id}`, {
+    headers: { authorization: ['Bearer', customerToken].join(' ') },
+  })
+  assert.equal(ownerBookingDetail.status, 200)
+  assert.equal((await ownerBookingDetail.json()).booking.id, booking.id)
 })
 
 test('admin APIs protect the workspace and manage fleet operations, pricing, bookings, and website content', async () => {
