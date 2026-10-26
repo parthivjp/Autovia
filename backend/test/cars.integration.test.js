@@ -293,6 +293,7 @@ test('customer site content, server quotes, bookings, availability, and wishlist
     Location.create({ name: 'Newly Added Location', city: 'Test City' }),
     Addon.create({ name: 'GPS', slug: 'test-gps', price: 300 }),
     Festival.create({ name: 'Test festival', date: '2027-01-02', multiplier: 2 }),
+    Festival.create({ name: 'Weekday festival', date: '2027-01-04', multiplier: 2 }),
     CarType.create({ name: 'Sedan', slug: 'test-sedan' }),
     Banner.create({ title: 'Test banner' }),
     Setting.create({ key: 'general', gstRate: 0.18 }),
@@ -416,11 +417,55 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   const { pricing } = await quoteResponse.json()
   assert.equal(pricing.days, 3)
   assert.equal(pricing.rental, 5500)
+  assert.equal(pricing.baseRental, 3000)
+  assert.equal(pricing.specialRateAdjustment, 2500)
+  assert.deepEqual(pricing.rateBreakdown.map(({ date, appliedRate, weekendRateApplied, festival }) => ({
+    date,
+    appliedRate,
+    weekendRateApplied,
+    festival: festival?.name || null,
+  })), [
+    { date: '2027-01-01', appliedRate: 1000, weekendRateApplied: false, festival: null },
+    { date: '2027-01-02', appliedRate: 3000, weekendRateApplied: true, festival: 'Test festival' },
+    { date: '2027-01-03', appliedRate: 1500, weekendRateApplied: true, festival: null },
+  ])
   assert.equal(pricing.extraKm, 250)
   assert.equal(pricing.addOns, 300)
   assert.equal(pricing.gst, 1089)
   assert.equal(pricing.total, 7139)
   assert.equal(pricing.securityDeposit, 5000)
+
+  const quoteDates = async (pickupDate, returnDate) => {
+    const response = await fetch(`${baseUrl}/api/v1/bookings/quote`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        carId: car.slug,
+        pickupDate,
+        returnDate,
+        location: 'Test Location',
+        extraKm: 0,
+      }),
+    })
+    assert.equal(response.status, 200)
+    return (await response.json()).pricing
+  }
+  const weekdayQuote = await quoteDates('2027-01-05', '2027-01-07')
+  assert.equal(weekdayQuote.rental, 2000)
+  assert.equal(weekdayQuote.baseRental, 2000)
+  assert.equal(weekdayQuote.specialRateAdjustment, 0)
+  assert.ok(weekdayQuote.rateBreakdown.every((day) => !day.specialRateApplied))
+  const weekendQuote = await quoteDates('2027-01-09', '2027-01-11')
+  assert.equal(weekendQuote.rental, 3000)
+  assert.equal(weekendQuote.baseRental, 2000)
+  assert.equal(weekendQuote.specialRateAdjustment, 1000)
+  assert.ok(weekendQuote.rateBreakdown.every((day) => day.weekendRateApplied))
+  const festivalWeekdayQuote = await quoteDates('2027-01-04', '2027-01-06')
+  assert.equal(festivalWeekdayQuote.rental, 3000)
+  assert.equal(festivalWeekdayQuote.baseRental, 2000)
+  assert.equal(festivalWeekdayQuote.specialRateAdjustment, 1000)
+  assert.equal(festivalWeekdayQuote.rateBreakdown[0].festival.name, 'Weekday festival')
+  assert.equal(festivalWeekdayQuote.rateBreakdown[0].weekendRateApplied, false)
 
   const bookingEvents = await openSiteUpdateStream()
   let booking
@@ -450,6 +495,10 @@ test('customer site content, server quotes, bookings, availability, and wishlist
   adminBookingId = booking.id
   adminCarId = car.slug
   assert.equal(booking.total, 7139)
+  assert.equal(booking.pricing.baseRental, 3000)
+  assert.equal(booking.pricing.specialRateAdjustment, 2500)
+  assert.equal(booking.pricing.rateBreakdown[0].festival, null)
+  assert.equal(booking.pricing.rateBreakdown[1].festival.name, 'Test festival')
   assert.equal(booking.location, 'Newly Added Location')
   assert.equal(booking.returnLocation, 'Test Location')
   assert.equal(booking.paymentMethod, 'Pay at Pickup')

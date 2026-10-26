@@ -254,8 +254,27 @@ export default function BookingPage() {
 
         <aside className="summary-card">
           <h2>Live price summary</h2>
-          <div className="summary-row"><span>Daily rate × {pricing?.days || '—'} days</span><strong>{pricing ? formatCurrency(pricing.rental) : '—'}</strong></div>
-          <div className="summary-row"><span>Weekend / festival rates</span><strong>Included above</strong></div>
+          <div className="summary-row"><span>Daily rate × {pricing?.days || '—'} days</span><strong>{pricing ? formatCurrency(pricing.baseRental ?? pricing.rental) : '—'}</strong></div>
+          <div className="summary-row">
+            <span>Weekend / festival adjustment</span>
+            <strong>
+              {!pricing ? '—' : pricing.specialRateAdjustment
+                ? `${pricing.specialRateAdjustment > 0 ? '+' : '−'}${formatCurrency(Math.abs(pricing.specialRateAdjustment))}`
+                : 'None for selected dates'}
+            </strong>
+          </div>
+          {pricing?.rateBreakdown?.some((day) => day.specialRateApplied) && (
+            <ul className="summary-rate-dates">
+              {pricing.rateBreakdown.filter((day) => day.specialRateApplied).map((day) => (
+                <li key={day.date}>
+                  {day.day}, {day.date}: {day.weekendRateApplied ? 'weekend rate' : 'daily rate'}
+                  {day.festival && ` + ${day.festival.name} (×${day.festival.multiplier})`}
+                  {' · '}{formatCurrency(day.appliedRate)}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="summary-row"><span>Rental total</span><strong>{pricing ? formatCurrency(pricing.rental) : '—'}</strong></div>
           <div className="summary-row"><span>Extra {selectedPackage?.km || 0} km</span><strong>{pricing ? formatCurrency(pricing.extraKm) : '—'}</strong></div>
           <div className="summary-row"><span>Add-ons</span><strong>{pricing ? formatCurrency(pricing.addOns) : '—'}</strong></div>
           <div className="summary-row"><span>GST ({Math.round((siteData.settings.gstRate || 0) * 100)}%)</span><strong>{pricing ? formatCurrency(pricing.gst) : '—'}</strong></div>

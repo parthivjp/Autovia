@@ -6,6 +6,21 @@ const cancellationSchema = new mongoose.Schema({
   cancelledBy: { type: String, enum: ['customer', 'admin'], required: true },
 }, { _id: false })
 
+const appliedFestivalSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  multiplier: { type: Number, required: true, min: 0 },
+}, { _id: false })
+
+const rentalDaySchema = new mongoose.Schema({
+  date: { type: String, required: true },
+  day: { type: String, required: true },
+  dailyRate: { type: Number, required: true, min: 0 },
+  appliedRate: { type: Number, required: true, min: 0 },
+  weekendRateApplied: { type: Boolean, default: false },
+  festival: { type: appliedFestivalSchema, default: null },
+  specialRateApplied: { type: Boolean, default: false },
+}, { _id: false })
+
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, required: true, unique: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
@@ -35,7 +50,10 @@ const bookingSchema = new mongoose.Schema({
   },
   pricing: {
     days: { type: Number, required: true, min: 1 },
+    baseRental: { type: Number, min: 0 },
     rental: { type: Number, required: true, min: 0 },
+    specialRateAdjustment: { type: Number },
+    rateBreakdown: { type: [rentalDaySchema], default: [] },
     extraKm: { type: Number, required: true, min: 0 },
     addOns: { type: Number, required: true, min: 0 },
     gst: { type: Number, required: true, min: 0 },

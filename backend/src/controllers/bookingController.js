@@ -130,14 +130,27 @@ async function calculateQuote(input) {
   }
 
   const festivals = await Festival.find({ date: { $in: days } }).lean()
-  const festivalRates = new Map(festivals.map((festival) => [festival.date, festival.multiplier]))
-  const rental = days.reduce((total, key) => {
+  const festivalRates = new Map(festivals.map((festival) => [festival.date, festival]))
+  const rateBreakdown = days.map((key) => {
     const date = parseDate(key)
     const weekday = date.getUTCDay()
-    const baseRate = weekday === 0 || weekday === 6 ? rate.weekendRate : rate.dailyRate
-    const multiplier = festivalRates.get(key) ?? 1
-    return total + Math.round(baseRate * multiplier)
-  }, 0)
+    const isWeekend = weekday === 0 || weekday === 6
+    const festival = festivalRates.get(key)
+    const baseRate = isWeekend ? rate.weekendRate : rate.dailyRate
+    const festivalMultiplier = festival?.multiplier ?? 1
+    const dayTotal = Math.round(baseRate * festivalMultiplier)
+    return {
+      date: key,
+      day: date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+      dailyRate: rate.dailyRate,
+      appliedRate: dayTotal,
+      weekendRateApplied: isWeekend,
+      festival: festival ? { name: festival.name, multiplier: festival.multiplier } : null,
+      specialRateApplied: isWeekend || Boolean(festival),
+    }
+  })
+  const baseRental = rate.dailyRate * days.length
+  const rental = rateBreakdown.reduce((total, day) => total + day.appliedRate, 0)
   const addOnsTotal = addons.reduce((total, addon) => total + addon.price, 0)
   const settings = await Setting.findOne({ key: 'general' }).lean()
   const gst = Math.round((rental + selectedPackage.price + addOnsTotal) * (settings?.gstRate ?? 0.18))
@@ -150,7 +163,10 @@ async function calculateQuote(input) {
     extraKmPackage: selectedPackage,
     pricing: {
       days: days.length,
+      baseRental,
       rental,
+      specialRateAdjustment: rental - baseRental,
+      rateBreakdown,
       extraKm: selectedPackage.price,
       addOns: addOnsTotal,
       gst,
